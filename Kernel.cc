@@ -145,6 +145,30 @@ int Kernel::close(int fd)
 }
 
 /**
+ * Create a hard link from src_path to dest_path.
+ * <p>
+ * If the source file does not exist, or the dest path already exists, -1 is returned.
+ * Simulates the unix system call:
+ * <pre>
+ *   int link(const char* oldpath, const char* newpath);
+ * </pre>
+ * </p>
+ * @param src_path path to the existing file
+ * @param dest_path path to the link to be created
+ * @return  On success, zero is returned.  On error, -1 is returned, and errno is set appropriately.
+ */
+int Kernel::link(char* src_path, char* dest_path){
+
+    // find the inode number for src_path
+
+    // write the directory entry for dest_path which references the same index
+
+    // increment nlink
+
+    return -1;
+}
+
+/**
  * Creates a file or directory with the specified mode.  
  * <p>
  * Creates a new file or prepares to rewrite an existing file.

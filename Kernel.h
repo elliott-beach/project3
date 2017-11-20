@@ -63,6 +63,7 @@ class Kernel
 
 		static int close(int fd);
 		static int creat( char * pathname , short mode );
+                static int link(char* src_path, char* dest_path);
 		static void exit( int status );
 		static int lseek( int fd , int offset , int whence );
 
