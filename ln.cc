@@ -42,18 +42,8 @@ int main(int argc, char ** argv)
 		Kernel::exit( 2 ) ;
 	}
 
-	// open the output file
-	int out_fd = Kernel::creat(out_name, OUTPUT_MODE);
-	if(out_fd < 0)
-	{
-		Kernel::perror(PROGRAM_NAME);
-		cout << PROGRAM_NAME << ": unable to open output file \"" << in_name << "\"";
-		Kernel::exit(3);
-	}
-
 	Kernel::link(in_name, out_name);
 
 	// close the files
 	Kernel::close(in_fd);
-	Kernel::close(out_fd);
 }
