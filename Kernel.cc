@@ -696,6 +696,7 @@ int Kernel::readdir(int fd, DirectoryEntry& dirp)
 
 	// return 0 if at end of directory
 //	cout << "getOffset()" <<  file->getOffset() << " getSize " << file->getSize();
+	//cout << file->getSize() << endl;
 	if( file->getOffset() >= file->getSize() )
 	{
 //		cout << "we could see 48 offset not happen in java"<< endl;
@@ -923,6 +924,7 @@ int Kernel::write(int fd, char * buf, int count)
  */
 int Kernel::writedir( int fd , DirectoryEntry& dirp ) 
 {
+    cout << dirp.d_ino << " + " << dirp.d_name << endl;
 	// check fd
 	int status = check_fd_for_write( fd ) ;
 	if( status < 0 )
@@ -1370,140 +1372,52 @@ short Kernel::findIndexNode( char * path , IndexNode& inode )
 	return indexNodeNumber ;
 }
 
+
 int Kernel::link(char *oldpath, char *newpath) {
-  	// get the full path
-	char *fullPath = getFullPath(oldpath);
-	char dirname[1024];
+    	char dirname[1024];
 	memset(dirname, '\0', 1024);
 	strcpy(dirname, "/" );
-
-	FileSystem * fileSystem = openFileSystems;
-	IndexNode currIndexNode;
-	IndexNode prevIndexNode;
-	IndexNode emptyIndexNode;
-	getRootIndexNode()->copy(currIndexNode);
-
-	short indexNodeNumber = FileSystem::ROOT_INDEX_NODE_NUMBER ;
-
-	char * token = NULL;
-	token = strtok(fullPath, "/");
-	char name[512];// = "." ; // start at root node
-	memset(name, '\0', 512);
-	strcpy(name, ".");	//may be not needed. 
-
-	while(1)
-	{
-		if(token != NULL) {
-			memset(name, '\0', 512);
-			strcpy(name, token);
-
-			// check to see if the current node is a directory
-
-			if((currIndexNode.getMode()&S_IFMT) != S_IFDIR) {
-				// return (ENOTDIR) if a needed directory is not a directory
-				process.errno = ENOTDIR ;
-				return -1 ;
-			}
-
-			// get the next inode corresponding to the token
-			currIndexNode.copy(prevIndexNode);
-		
-			//Init CurIndexNode
-			emptyIndexNode.copy(currIndexNode);
-			indexNodeNumber = findNextIndexNode(openFileSystems, prevIndexNode, name, currIndexNode);
-		}
-		else {
-			break;
-		}
-
-		token = strtok(NULL, "/");
-
-		if(token != NULL) {
-			strcat(dirname, name);	
-			strcat(dirname, "/");
-		}
-	}
-
 	int flags = O_WRONLY ; // ???
 	FileDescriptor * fileDescriptor = NULL;
+	FileSystem * fileSystem = openFileSystems;
 
-	int sourceIndexNodeNumber;
+      	// get the full path
+	char *fullPath = getFullPath(oldpath);
+	IndexNode sourceIndexNode;
+	short sourceInodeNumber = findIndexNode(fullPath, sourceIndexNode);
+	cout << "size: " << sourceIndexNode.getSize() << endl;
 	
-	// If oldpath doesn't exist, we can't create a link
-	if ( indexNodeNumber < 0 ) {
-	  return -1;
-	}
-	else { // file does exist ( indexNodeNumber >= 0 )
-	        
-		// if it's a directory, we can't make a link to it
-		if((currIndexNode.getMode() & S_IFMT ) == S_IFDIR) {
-			// return (EISDIR) if the file is a directory
-			process.errno = EISDIR ;
-			return -1 ;
-		}
-
-		sourceIndexNodeNumber = indexNodeNumber;
-		cout << indexNodeNumber << endl;
-	}
-	//######################################################################
-
 	char *fullNewPath = getFullPath(newpath);
-	memset(dirname, '\0', 1024);
-	strcpy(dirname, "/" );
-
-	emptyIndexNode.copy(currIndexNode);
-	emptyIndexNode.copy(prevIndexNode);
-	getRootIndexNode()->copy(currIndexNode);
-
-	indexNodeNumber = FileSystem::ROOT_INDEX_NODE_NUMBER ;
-
-	token = NULL;
+	IndexNode newNode;
+	short newInodeNumber = findIndexNode(fullNewPath, newNode);
+	
+	fullNewPath = getFullPath(newpath);
+	char * token = NULL;
+	cout << fullNewPath << endl;
 	token = strtok(fullNewPath, "/");
+	char name[512];// = "." ; // start at root node
 	memset(name, '\0', 512);
-	strcpy(name, ".");	//may be not needed.
 
+	cout << token << endl;
 
 	while(1) {
 	    if(token != NULL) {
 		memset(name, '\0', 512);
 		strcpy(name, token);
-
-		// check to see if the current node is a directory
-
-		if((currIndexNode.getMode()&S_IFMT) != S_IFDIR) {
-		    // return (ENOTDIR) if a needed directory is not a directory
-		    process.errno = ENOTDIR ;
-		    return -1 ;
-		}
-
-		// get the next inode corresponding to the token
-		currIndexNode.copy(prevIndexNode);
-		
-		//Init CurIndexNode
-		emptyIndexNode.copy(currIndexNode);
-		indexNodeNumber = findNextIndexNode(openFileSystems, prevIndexNode, name, currIndexNode);
-		cout << "Name: " << name << " inode: " << indexNodeNumber << endl;
-	      }
-	    else {
-	      break;
-	    }
-
+	    } else
+		break;
 	    token = strtok(NULL, "/");
-
 	    if(token != NULL) {
 		strcat(dirname, name);	
 		strcat(dirname, "/");
 	    }
 	}
-
-	fileDescriptor = NULL;
-	IndexNode sourceIndexNode;
-
-	// file does not exist.  We check to see if we can create it.
-	if ( indexNodeNumber < 0 ) {
-
+	cout << "dirrrrr: " << dirname << endl;
+	
+	if(newInodeNumber < 0) {
 	    // Copy the source inode over
-	    fileSystem->readIndexNode(&sourceIndexNode, sourceIndexNodeNumber);
+	    fileSystem->readIndexNode(&sourceIndexNode, sourceInodeNumber);
+	    cout << "size: " << sourceIndexNode.getSize() << endl;
 
 	    // Increment nlinks
 	    int nlinks = sourceIndexNode.getNlink();
@@ -1511,11 +1425,11 @@ int Kernel::link(char *oldpath, char *newpath) {
 	    sourceIndexNode.setNlink(nlinks);
 
 	    // Write inode
-	    fileSystem->writeIndexNode(&sourceIndexNode , sourceIndexNodeNumber);
+	    fileSystem->writeIndexNode(&sourceIndexNode, sourceInodeNumber);
 	    
 	    fileDescriptor = new FileDescriptor(fileSystem, sourceIndexNode , flags);
 	    // assign inode for the new file
-	    fileDescriptor->setIndexNodeNumber( sourceIndexNodeNumber ) ;
+	    fileDescriptor->setIndexNodeNumber(sourceInodeNumber);
 
 	    // open the directory
 	    // instead of a name for the dir
@@ -1530,15 +1444,14 @@ int Kernel::link(char *oldpath, char *newpath) {
 	    // scan past the directory entries less than the current entry
 	    // and insert the new element immediately following
 	    int status = 0;
-	    DirectoryEntry newDirectoryEntry(sourceIndexNodeNumber, name);
-	    printf("Inode num: %d\n", sourceIndexNodeNumber);
+	    DirectoryEntry newDirectoryEntry(sourceInodeNumber, name);
+	    cout << "Name: " << name << " Inode: " << sourceInodeNumber << endl;
 	    DirectoryEntry currentDirectoryEntry;
-
 	    while(true)
 	    {
 		// read an entry from the directory
 		status = readdir(dir, currentDirectoryEntry);
-
+		cout << "Dir is: " << dir << " status: " << status << endl;
 		if(status < 0) {
 		    cout << PROGRAM_NAME << ": error reading directory in creat";
 		    exit( EXIT_FAILURE ) ;
@@ -1546,14 +1459,12 @@ int Kernel::link(char *oldpath, char *newpath) {
 		else if( status == 0 ) {
 		    // if no entry read, write the new item at the current 
 		    // location and break
-		    writedir( dir , newDirectoryEntry) ;
+		    writedir(dir , newDirectoryEntry);
+
 		    IndexNode note;
-		    
-		    static char funPath[1024];
-		    memset(fullPath, '\0', 1024);
-		    strcpy(funPath, "/away/jon/new.txt");
+		    char *funPath = getFullPath(newpath);
 		    short num = findIndexNode(funPath, note);
-		    //cout << "num is: " << num << endl;
+		    cout << "num is: " << num << endl;
 		    
 		    break ;
 		}
@@ -1598,49 +1509,7 @@ int Kernel::link(char *oldpath, char *newpath) {
 	    // close the directory
 	    close(dir) ;
 	}
-	// Assume it doesn't exist in the filesystem yet
-	/*else
-	  {
-	  // file does exist ( indexNodeNumber >= 0 )
-
-	  // if it's a directory, we can't truncate it
-	  if((currIndexNode.getMode() & S_IFMT ) == S_IFDIR)
-	  {
-	  // return (EISDIR) if the file is a directory
-	  process.errno = EISDIR ;
-	  return -1 ;
-	  }
-
-	  // check to see if the file is writeable by the user
-	  // ??? tbd
-	  // return (EACCES) if the file does exist and is unwritable
-
-	  // free any blocks currently allocated to the file
-	  int blockSize = fileSystem->getBlockSize();
-	  int blocks = (currIndexNode.getSize() + blockSize-1) / blockSize;
-	  for( int i = 0 ; i < blocks ; i ++ )
-	  {
-	  int address = currIndexNode.getBlockAddress(i) ;
-	  if( address != FileSystem::NOT_A_BLOCK )
-	  {
-	  fileSystem->freeBlock(address);
-	  currIndexNode.setBlockAddress(i , FileSystem::NOT_A_BLOCK);
-	  }
-	  }
-
-	  // update the inode to size 0
-	  currIndexNode.setSize(0);
-
-	  // write the inode to the file system.
-	  fileSystem->writeIndexNode(&currIndexNode, indexNodeNumber);
-
-	  // set up the file descriptor
-	  fileDescriptor = new FileDescriptor(fileSystem , currIndexNode, flags);
-	  // assign inode for the new file
-	  fileDescriptor->setIndexNodeNumber(indexNodeNumber);
-	  }
-
-	*/
-	
-	return open(fileDescriptor) ;
+	else {
+	    cout << newpath << " already exists!" << endl;
+	}
 }

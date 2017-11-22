@@ -55,5 +55,5 @@ SuperBlock.o: SuperBlock.cc
 	g++ -c SuperBlock.cc
 
 clean:
-	rm *.o mkfs ls cat tee cp dump mkdir
+	rm *.o mkfs ls cat tee cp dump mkdir ln
 
