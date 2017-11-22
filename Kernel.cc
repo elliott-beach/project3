@@ -1380,7 +1380,6 @@ int Kernel::link(char *oldpath, char *newpath) {
 	char *fullPath = getFullPath(oldpath);
 	IndexNode sourceIndexNode;
 	short sourceInodeNumber = findIndexNode(fullPath, sourceIndexNode);
-	cout << "size: " << sourceIndexNode.getSize() << endl;
 	
 	char *fullNewPath = getFullPath(newpath);
 	IndexNode newNode;
@@ -1392,8 +1391,6 @@ int Kernel::link(char *oldpath, char *newpath) {
 	token = strtok(fullNewPath, "/");
 	char name[512];// = "." ; // start at root node
 	memset(name, '\0', 512);
-
-	cout << token << endl;
 
 	while(1) {
 	    if(token != NULL) {
@@ -1407,12 +1404,10 @@ int Kernel::link(char *oldpath, char *newpath) {
 		strcat(dirname, "/");
 	    }
 	}
-	cout << "dirrrrr: " << dirname << endl;
 	
 	if(newInodeNumber < 0) {
 	    // Copy the source inode over
 	    fileSystem->readIndexNode(&sourceIndexNode, sourceInodeNumber);
-	    cout << "size: " << sourceIndexNode.getSize() << endl;
 
 	    // Increment nlinks
 	    int nlinks = sourceIndexNode.getNlink();
@@ -1440,13 +1435,11 @@ int Kernel::link(char *oldpath, char *newpath) {
 	    // and insert the new element immediately following
 	    int status = 0;
 	    DirectoryEntry newDirectoryEntry(sourceInodeNumber, name);
-	    cout << "Name: " << name << " Inode: " << sourceInodeNumber << endl;
 	    DirectoryEntry currentDirectoryEntry;
 	    while(true)
 	    {
 		// read an entry from the directory
 		status = readdir(dir, currentDirectoryEntry);
-		cout << "Dir is: " << dir << " status: " << status << endl;
 		if(status < 0) {
 		    cout << PROGRAM_NAME << ": error reading directory in creat";
 		    exit( EXIT_FAILURE ) ;
