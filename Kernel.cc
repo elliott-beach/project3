@@ -522,10 +522,9 @@ int Kernel::open( char * pathname , int flags )
 {
 	// get the full path name
 	char * fullPath = getFullPath( pathname ) ;
-	
+
 	IndexNode indexNode;
 	short indexNodeNumber = findIndexNode(fullPath , indexNode);
-	cout << indexNodeNumber << endl;
 	
 	if( indexNodeNumber < 0 )
 	{
@@ -696,7 +695,6 @@ int Kernel::readdir(int fd, DirectoryEntry& dirp)
 
 	// return 0 if at end of directory
 //	cout << "getOffset()" <<  file->getOffset() << " getSize " << file->getSize();
-	//cout << file->getSize() << endl;
 	if( file->getOffset() >= file->getSize() )
 	{
 //		cout << "we could see 48 offset not happen in java"<< endl;
@@ -924,7 +922,6 @@ int Kernel::write(int fd, char * buf, int count)
  */
 int Kernel::writedir( int fd , DirectoryEntry& dirp ) 
 {
-    cout << dirp.d_ino << " + " << dirp.d_name << endl;
 	// check fd
 	int status = check_fd_for_write( fd ) ;
 	if( status < 0 )
@@ -972,8 +969,6 @@ int Kernel::writedir( int fd , DirectoryEntry& dirp )
 	// return the size of a DirectoryEntry
 	return DirectoryEntry::DIRECTORY_ENTRY_SIZE ;
 }
-
-
 
 /*
    to be done:
