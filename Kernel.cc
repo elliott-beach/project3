@@ -1433,9 +1433,9 @@ int Kernel::link(char *oldpath, char *newpath) {
 		    // location and break
 		    writedir(dir , newDirectoryEntry);
 
-		    // Still figuring out what this does
-		    IndexNode note;
-		    fileSystem->readIndexNode(&note , sourceInodeNumber);
+		    // Update the inode
+		    IndexNode dummy;
+		    fileSystem->writeIndexNode(&dummy, sourceInodeNumber);
 		    
 		    break ;
 		}
