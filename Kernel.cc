@@ -1315,83 +1315,78 @@ short Kernel::findNextIndexNode(FileSystem * fileSystem, IndexNode& indexNode , 
 // get the inode for a file which is expected to exist
 short Kernel::findIndexNode( char * path , IndexNode& inode )
 {
-	// start with the root file system, root inode
-	//FileSystem fileSystem = openFileSystems[ ROOT_FILE_SYSTEM ] ;
-	IndexNode indexNode;
-	getRootIndexNode()->copy(indexNode);
+    
+    // start with the root file system, root inode
+    //FileSystem fileSystem = openFileSystems[ ROOT_FILE_SYSTEM ] ;
+    IndexNode indexNode;
+    getRootIndexNode()->copy(indexNode);
 
-	short indexNodeNumber = FileSystem::ROOT_INDEX_NODE_NUMBER ;
+    short indexNodeNumber = FileSystem::ROOT_INDEX_NODE_NUMBER ;
 
-	// parse the path until we get to the end
-	char * token;
+    // parse the path until we get to the end
+    char * token;
     token = strtok(path, "/");
     char name[512];// = "." ; // start at root node
-	memset(name, '\0', 512);
+    memset(name, '\0', 512);
  
-	while(token != NULL)
-	{
-//		cout << token << endl;
+    while(token != NULL) {
 
-		if (strcmp(token, "") != 0)
-		{
-			// check to see if it is a directory
-			if( ( indexNode.getMode() & S_IFMT ) != S_IFDIR )
-			{
-				// return (ENOTDIR) if a needed directory is not a directory
-				process.errno = ENOTDIR ;
-				return -1 ;
-			}
+	if (strcmp(token, "") != 0) {
+	    // check to see if it is a directory
+	    if( ( indexNode.getMode() & S_IFMT ) != S_IFDIR )
+	    {
+		// return (ENOTDIR) if a needed directory is not a directory
+		process.errno = ENOTDIR;
+		return -1;
+	    }
 
-			// check to see if it is readable by the user
-			// ??? tbd
-			// return (EACCES) if a needed directory is not readable
+	    IndexNode nextIndexNode;
+	    // get the next index node corresponding to the token
+	    indexNodeNumber = findNextIndexNode( 
+		openFileSystems, indexNode , token, nextIndexNode );
+	    if( indexNodeNumber < 0 ) {
+		// return ENOENT
+		process.errno = ENOENT;
+		return -1 ;
+	    }
 
-			IndexNode nextIndexNode;
-			// get the next index node corresponding to the token
-			indexNodeNumber = findNextIndexNode( 
-					openFileSystems, indexNode , token, nextIndexNode ) ;
-			if( indexNodeNumber < 0 )
-			{
-				// return ENOENT
-				process.errno = ENOENT ;
-				return -1 ;
-			}
-
-			nextIndexNode.copy(indexNode);
-		}
-		
-		token = strtok(NULL, "/");
+	    nextIndexNode.copy(indexNode);
 	}
-	// copy indexNode to inode
-	indexNode.copy( inode ) ;
-	return indexNodeNumber ;
+		
+	token = strtok(NULL, "/");
+    }
+    // copy indexNode to inode
+    indexNode.copy( inode ) ;
+    return indexNodeNumber ;
 }
 
 
 int Kernel::link(char *oldpath, char *newpath) {
-    	char dirname[1024];
-	memset(dirname, '\0', 1024);
-	strcpy(dirname, "/" );
-	int flags = O_WRONLY ; // ???
-	FileDescriptor * fileDescriptor = NULL;
-	FileSystem * fileSystem = openFileSystems;
 
-      	// get the full path
+    	FileSystem * fileSystem = openFileSystems;
+
+      	// get the full path of oldpath
 	char *fullPath = getFullPath(oldpath);
 	IndexNode sourceIndexNode;
 	short sourceInodeNumber = findIndexNode(fullPath, sourceIndexNode);
-	
+
+	// get full path of newpath
 	char *fullNewPath = getFullPath(newpath);
 	IndexNode newNode;
 	short newInodeNumber = findIndexNode(fullNewPath, newNode);
+
+	fullNewPath = getFullPath(newpath); // Redo this b/c something changes fullNewPath as side effect
 	
-	fullNewPath = getFullPath(newpath);
-	char * token = NULL;
-	cout << fullNewPath << endl;
+	char dirname[1024];
+	memset(dirname, '\0', 1024);
+	strcpy(dirname, "/");
+
+	char *token = NULL;
 	token = strtok(fullNewPath, "/");
-	char name[512];// = "." ; // start at root node
+	char name[512];
 	memset(name, '\0', 512);
 
+	// Find the name of the file and the directory that its in
 	while(1) {
 	    if(token != NULL) {
 		memset(name, '\0', 512);
@@ -1406,24 +1401,13 @@ int Kernel::link(char *oldpath, char *newpath) {
 	}
 	
 	if(newInodeNumber < 0) {
-	    // Copy the source inode over
-	    fileSystem->readIndexNode(&sourceIndexNode, sourceInodeNumber);
 
-	    // Increment nlinks
+	    // Increment nlinks of the sourceIndexNode's count
 	    int nlinks = sourceIndexNode.getNlink();
 	    nlinks++;
 	    sourceIndexNode.setNlink(nlinks);
 
-	    // Write inode
-	    fileSystem->writeIndexNode(&sourceIndexNode, sourceInodeNumber);
-	    
-	    fileDescriptor = new FileDescriptor(fileSystem, sourceIndexNode , flags);
-	    // assign inode for the new file
-	    fileDescriptor->setIndexNodeNumber(sourceInodeNumber);
-
-	    // open the directory
-	    // instead of a name for the dir
-	    cout << "dirname: " << dirname << endl;
+	    // Open the file's directory
 	    int dir = open(dirname , O_RDWR);
 	    if( dir < 0 ) {
 		perror(PROGRAM_NAME);
@@ -1431,28 +1415,27 @@ int Kernel::link(char *oldpath, char *newpath) {
 		return -1;
 	    }
 
-	    // scan past the directory entries less than the current entry
+	    // Scan past the directory entries less than the current entry
 	    // and insert the new element immediately following
 	    int status = 0;
 	    DirectoryEntry newDirectoryEntry(sourceInodeNumber, name);
 	    DirectoryEntry currentDirectoryEntry;
 	    while(true)
 	    {
-		// read an entry from the directory
+		// Read an entry from the directory
 		status = readdir(dir, currentDirectoryEntry);
 		if(status < 0) {
 		    cout << PROGRAM_NAME << ": error reading directory in creat";
 		    exit( EXIT_FAILURE ) ;
 		}
 		else if( status == 0 ) {
-		    // if no entry read, write the new item at the current 
+		    // If no entry read, write the new item at the current 
 		    // location and break
 		    writedir(dir , newDirectoryEntry);
 
+		    // Still figuring out what this does
 		    IndexNode note;
-		    char *funPath = getFullPath(newpath);
-		    short num = findIndexNode(funPath, note);
-		    cout << "num is: " << num << endl;
+		    fileSystem->readIndexNode(&note , sourceInodeNumber);
 		    
 		    break ;
 		}
@@ -1472,13 +1455,11 @@ int Kernel::link(char *oldpath, char *newpath) {
 		}
 	    }
 
-	    // copy the rest of the directory entries out to the file
+	    // Copy the rest of the directory entries out to the file
 	    DirectoryEntry nextDirectoryEntry;
-
 	    while(status>0)	{
 		// read next item
 		status = readdir(dir , nextDirectoryEntry);
-
 		if(status>0) {	
 		    // in its place
 		    int seek_status = lseek(dir, -DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
@@ -1487,14 +1468,10 @@ int Kernel::link(char *oldpath, char *newpath) {
 			exit( EXIT_FAILURE ) ;
 		    }
 		}
-		// write current item
 		writedir( dir , currentDirectoryEntry );
-
-		// current item = next item
 		nextDirectoryEntry.copy(currentDirectoryEntry);
-	    } 
+	    }
 
-	    // close the directory
 	    close(dir) ;
 	}
 	else {
