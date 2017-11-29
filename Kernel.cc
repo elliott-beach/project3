@@ -1557,6 +1557,9 @@ int Kernel::unlink(const char *pathname) {
 		exit( EXIT_FAILURE ) ;
 	    }
 	    else if(status == 0) {
+		// TODO: Check if the file is open by an process. If so, mark it so its blocks
+		// will be freed when the last process closes.
+		
 		// Finished shifting everything, shrink the size of the directory
 		FileDescriptor *file = process.openFiles[dir] ;
 		file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
