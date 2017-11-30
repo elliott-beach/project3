@@ -115,6 +115,7 @@ int IndexNode::getBlockAddress(int block)
 	}
 	else
 	{
+	  // Handle indirectBlock here
 		cout << "invalid block address " << block <<endl;
 	}
 }
@@ -127,7 +128,7 @@ int IndexNode::getBlockAddress(int block)
  * less than the number of blocks in the file system
  * @exception java.lang.Exception if the block number is invalid
  */
-void IndexNode::setBlockAddress(int block , int address)
+void IndexNode::setBlockAddress(int block , int address) // Take in a filesystem structure?
 {
 	if(block >= 0 && block < MAX_DIRECT_BLOCKS)
 	{
@@ -135,6 +136,7 @@ void IndexNode::setBlockAddress(int block , int address)
 	}
 	else
 	{
+	  // Handle inDirectBlock here - 
 		cout << "invalid block address " << block <<endl;
 	}
 
@@ -213,6 +215,13 @@ void IndexNode::write(char * buffer, int offset)
 
 	// leave room for indirectBlock, doubleIndirectBlock, tripleIndirectBlock
 
+	// I think just add the address of the indirectBlock here
+	/*
+		buffer[offset+42]   = (unsigned char)(indirectBlock >> 16);
+		buffer[offset+42+1] = (unsigned char)(indirectBlock >> 8);
+		buffer[offset+42+2] = (unsigned char)(indirectBlock);
+	*/
+
 	// leave room for atime, mtime, ctime
 }
 
@@ -269,6 +278,14 @@ void IndexNode::read(char * buffer , int offset)
 	}
 
 	// leave room for indirectBlock, doubleIndirectBlock, tripleIndirectBlock
+
+	/* Something like this
+		b2 = buffer[offset+42] & 0xff ;
+		b1 = buffer[offset+42+1] & 0xff ;
+		b0 = buffer[offset+42+2] & 0xff ;
+		indirectBlock = b2 << 16 | b1 << 8 | b0 ;
+
+	 */
 
 	// leave room for atime, mtime, ctime
 }
