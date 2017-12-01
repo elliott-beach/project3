@@ -88,6 +88,7 @@ class Kernel
 		static void finalize( int status );
 
 		static int link(char *oldpath, char *newpath);
+		static int unlink(char *pathname);
 
 	private:
 		static ProcessContext process;

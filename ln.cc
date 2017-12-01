@@ -22,7 +22,7 @@ int main(int argc, char ** argv)
 	if(argc != 3)
 	{
 		cout << PROGRAM_NAME << ": usage: " << PROGRAM_NAME << " input-file output-file";
-		Kernel::exit( 1 ) ;
+		Kernel::exit(2);
 	}
 
 	// give the parameters more meaningful names
@@ -32,14 +32,13 @@ int main(int argc, char ** argv)
 	strcpy(in_name, argv[1]);
 	strcpy(out_name, argv[2]);
 
-		// open the input file
+	// open the input file
 	int in_fd = Kernel::open(in_name , Kernel::O_RDONLY);
 
-	if(in_fd < 0)
-	{
+	if(in_fd < 0) {
 		Kernel::perror(PROGRAM_NAME);
 		cout << PROGRAM_NAME << ": unable to open input file \"" << in_name << "\"";
-		Kernel::exit( 2 ) ;
+		Kernel::exit(2) ;
 	}
 
 	Kernel::link(in_name, out_name);
