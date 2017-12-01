@@ -1,4 +1,4 @@
-all: mkfs ls cat tee cp dump mkdir
+all: mkfs ls cat tee cp dump mkdir ln
 
 cp: cp.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
 	g++ cp.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o cp
@@ -17,6 +17,9 @@ cat: cat.cc Stat.o FileDescriptor.o FileSystem.o BitBlock.o IndexNode.o Director
 
 mkfs: mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o
 	g++ mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o -o mkfs
+
+ln: ln.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
+	g++ ln.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o ln
 
 dump: dump.cc
 	g++ dump.cc -o dump
@@ -52,5 +55,5 @@ SuperBlock.o: SuperBlock.cc
 	g++ -c SuperBlock.cc
 
 clean:
-	rm *.o mkfs ls cat tee cp dump mkdir
+	rm *.o mkfs ls cat tee cp dump mkdir ln
 
