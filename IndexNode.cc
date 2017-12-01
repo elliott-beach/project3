@@ -1,3 +1,5 @@
+#include "FileSystem.h"
+#include "Kernel.h"
 #include "IndexNode.h"
 #include <stdlib.h>
 #include <string.h>
@@ -109,14 +111,23 @@ int IndexNode::getSize()
  */
 int IndexNode::getBlockAddress(int block)
 {
-	if(block >= 0 && block < MAX_DIRECT_BLOCKS)
-	{
+	if(block >= 0 && block < MAX_DIRECT_BLOCKS) {
 		return(directBlocks[block]);
 	}
-	else
-	{
-	  // Handle indirectBlock here
-		cout << "invalid block address " << block <<endl;
+	else if(indirectBlock == NOT_A_BLOCK) {
+	    return indirectBlock;
+	}
+	else {
+	    FileSystem *fileSystem = &Kernel::openFileSystems[Kernel::ROOT_FILE_SYSTEM];
+	    int blockSize = fileSystem->getBlockSize();
+	    char ptrBlock[blockSize];
+	    fileSystem->read(ptrBlock, blockSize);
+	    int b3 = ptrBlock[block*4] & 0xff;
+	    int b2 = ptrBlock[block*4+1] & 0xff;
+	    int b1 = ptrBlock[block*4+2] & 0xff;
+	    int b0 = ptrBlock[block*4+3] & 0xff;
+	    
+	    return (b3 << 24 | b2 << 16 | b1 << 8 | b0); 
 	}
 }
 
@@ -128,17 +139,50 @@ int IndexNode::getBlockAddress(int block)
  * less than the number of blocks in the file system
  * @exception java.lang.Exception if the block number is invalid
  */
-void IndexNode::setBlockAddress(int block , int address) // Take in a filesystem structure?
+void IndexNode::setBlockAddress(int block, int address) // Take in a filesystem structure?
 {
+    FileSystem *fileSystem = &Kernel::openFileSystems[Kernel::ROOT_FILE_SYSTEM];
+    cout << "Block size is: " << fileSystem->getBlockSize() << endl;
 	if(block >= 0 && block < MAX_DIRECT_BLOCKS)
 	{
 		directBlocks[block] = address ;
 	}
-	else
+	else if(indirectBlock == NOT_A_BLOCK)
 	{
-	  // Handle inDirectBlock here - 
-		cout << "invalid block address " << block <<endl;
+	    int blockSize = fileSystem->getBlockSize();
+	    
+	    // Pick an address for the indirectBlock
+	    int indirectAddress = fileSystem->allocateBlock();
+	    if(indirectAddress < 0 ) {
+		return; // Maybe we should exit?
+	    }
+	    
+	    // Initialize the whole indirectBlock to NOT_A_BLACK
+	    char newBlock[blockSize];
+	    for(int i = 0; i < blockSize; i+=4) {
+		newBlock[i] = (unsigned char)(NOT_A_BLOCK >> 24);
+		newBlock[i+1] = (unsigned char)(NOT_A_BLOCK >> 16);
+		newBlock[i+2] = (unsigned char)(NOT_A_BLOCK >> 8);
+		newBlock[i+3] = (unsigned char)(NOT_A_BLOCK);
+	    }
+	    // Fill in the address
+	    newBlock[block] = (unsigned char)(address >> 24);
+	    newBlock[block+1] = (unsigned char)(address >> 16);
+	    newBlock[block+2] = (unsigned char)(address >> 8);
+	    newBlock[block+3] = (unsigned char)(address);
+	    fileSystem->write(newBlock, blockSize);
 	}
+	else {
+	    int blockSize = fileSystem->getBlockSize();
+	    char ptrBlock[blockSize];
+	    fileSystem->read(ptrBlock, blockSize);
+	    ptrBlock[block] = (unsigned char)(address >> 24);
+	    ptrBlock[block+1] = (unsigned char)(address >> 16);
+	    ptrBlock[block+2] = (unsigned char)(address >> 8);
+	    ptrBlock[block+3] = (unsigned char)(address);
+
+	    fileSystem->write(ptrBlock, blockSize);
+	}   
 
 }
 
