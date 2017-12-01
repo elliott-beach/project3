@@ -11,7 +11,6 @@ class IndexNode
 	public:
 		const static int INDEX_NODE_SIZE = 64 ;
 		const static int MAX_DIRECT_BLOCKS = 10 ;
-		const static int MAX_FILE_BLOCKS =  MAX_DIRECT_BLOCKS;// + blockSize / 4
 
 	private:
 		unsigned short mode;

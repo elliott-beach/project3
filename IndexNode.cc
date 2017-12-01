@@ -111,17 +111,16 @@ int IndexNode::getSize()
  */
 int IndexNode::getBlockAddress(int block)
 {
+	FileSystem *fileSystem = Kernel::openFileSystems;
 	if(block >= 0 && block < MAX_DIRECT_BLOCKS) {
 		return(directBlocks[block]);
 	}
 	else if(indirectBlock == NOT_A_BLOCK) {
 	    return indirectBlock;
 	}
-	else if(block < MAX_FILE_BLOCKS) {
-	    FileSystem *fileSystem = Kernel::openFileSystems;
+	else if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
 	    int blockSize = fileSystem->getBlockSize();
 	    char ptrBlock[blockSize];
-
 	    // Read in the current indirectBlock and then read the address
 	    fileSystem->read(ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
 	    int b3 = ptrBlock[(block-10)*4] & 0xff;
@@ -146,14 +145,12 @@ int IndexNode::getBlockAddress(int block)
  */
 void IndexNode::setBlockAddress(int block, int address) // Take in a filesystem structure?
 {
-    cout << "Block is: " << block << endl;
+	FileSystem *fileSystem = Kernel::openFileSystems;
 	if(block >= 0 && block < MAX_DIRECT_BLOCKS)
 	{
 		directBlocks[block] = address ;
 	}
-	else if(indirectBlock == NOT_A_BLOCK)
-	{
-	    FileSystem *fileSystem = Kernel::openFileSystems;
+	else if(indirectBlock == NOT_A_BLOCK){
 	    int blockSize = fileSystem->getBlockSize();
 	    
 	    // Pick an address for the indirectBlock
@@ -178,8 +175,7 @@ void IndexNode::setBlockAddress(int block, int address) // Take in a filesystem 
 	    
 	    fileSystem->write(newBlock, fileSystem->getDataBlockOffset() + indirectBlock);
 	}
-	else if(block < MAX_FILE_BLOCKS) {
-	    FileSystem *fileSystem = Kernel::openFileSystems;
+	else if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
 	    int blockSize = fileSystem->getBlockSize();
 	    char ptrBlock[blockSize];
 
