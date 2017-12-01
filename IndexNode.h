@@ -1,11 +1,8 @@
 #ifndef INDEXNODE_H
 #define INDEXNODE_H
 
-//#include "FileSystem.h"
-//#include "Kernel.h"
 #include <iostream>
 #include <fstream>
-//#include "FileSystem.h"
 
 using namespace std;
 
@@ -14,7 +11,7 @@ class IndexNode
 	public:
 		const static int INDEX_NODE_SIZE = 64 ;
 		const static int MAX_DIRECT_BLOCKS = 10 ;
-		const static int MAX_FILE_BLOCKS = MAX_DIRECT_BLOCKS ; // What should this be?
+		const static int MAX_FILE_BLOCKS =  MAX_DIRECT_BLOCKS;// + blockSize / 4
 
 	private:
 		unsigned short mode;
@@ -23,7 +20,7 @@ class IndexNode
 		unsigned short gid;
 		int size;
 		int directBlocks[10];
-		int indirectBlock;//Not yet implemented.
+		int indirectBlock;
 		int doubleIndirectBlock;//Not yet implemented.
 		int tripleIndirectBlock;//Not yet implemented.
 		int atime;//Not yet implemented.
