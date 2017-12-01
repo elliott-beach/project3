@@ -123,12 +123,7 @@ int IndexNode::getBlockAddress(int block)
 	    char ptrBlock[blockSize];
 	    // Read in the current indirectBlock and then read the address
 	    fileSystem->read(ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
-	    int b3 = ptrBlock[(block-10)*4] & 0xff;
-	    int b2 = ptrBlock[(block-10)*4+1] & 0xff;
-	    int b1 = ptrBlock[(block-10)*4+2] & 0xff;
-	    int b0 = ptrBlock[(block-10)*4+3] & 0xff;
-
-	    return (b3 << 24 | b2 << 16 | b1 << 8 | b0); 
+		return ((int*)ptrBlock)[block];
 	}
 	else {
 	    cout << "Invalid block" << endl;
@@ -146,51 +141,35 @@ int IndexNode::getBlockAddress(int block)
 void IndexNode::setBlockAddress(int block, int address) // Take in a filesystem structure?
 {
 	FileSystem *fileSystem = Kernel::openFileSystems;
-	if(block >= 0 && block < MAX_DIRECT_BLOCKS)
-	{
+	if(block >= 0 && block < MAX_DIRECT_BLOCKS){
 		directBlocks[block] = address ;
+		return;
 	}
-	else if(indirectBlock == NOT_A_BLOCK){
+
+	if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
 	    int blockSize = fileSystem->getBlockSize();
-	    
-	    // Pick an address for the indirectBlock
-	    indirectBlock = fileSystem->allocateBlock();
-	    if(indirectBlock < 0 ) {
-	    	return; // Maybe we should exit?
-	    }
-	    
-	    // Initialize all the ptrs in indirectBlock to NOT_A_BLACK
-	    char newBlock[blockSize];
-	    for(int i = 0; i < blockSize; i+=4) {
-		newBlock[i] = (unsigned char)(NOT_A_BLOCK >> 24);
-		newBlock[i+1] = (unsigned char)(NOT_A_BLOCK >> 16);
-		newBlock[i+2] = (unsigned char)(NOT_A_BLOCK >> 8);
-		newBlock[i+3] = (unsigned char)(NOT_A_BLOCK);
-	    }
-	    // Fill in the address of the new block
-	    newBlock[(block-10)*4] = (unsigned char)(address >> 24);
-	    newBlock[(block-10)*4+1] = (unsigned char)(address >> 16);
-	    newBlock[(block-10)*4+2] = (unsigned char)(address >> 8);
-	    newBlock[(block-10)*4+3] = (unsigned char)(address);
-	    
-	    fileSystem->write(newBlock, fileSystem->getDataBlockOffset() + indirectBlock);
-	}
-	else if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
-	    int blockSize = fileSystem->getBlockSize();
-	    char ptrBlock[blockSize];
+		int size = blockSize / sizeof(int); // blockSize should definitely be a multiple of 4, otherwise this might not work.
+		int ptrBlock[size];
 
-	    // Read in the current indirectBlock
-	    fileSystem->read(ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
+		if(indirectBlock == NOT_A_BLOCK){
 
-	    // Update the indirectBlock with the new address
-	    ptrBlock[(block-10)*4] = (unsigned char)(address >> 24);
-	    ptrBlock[(block-10)*4+1] = (unsigned char)(address >> 16);
-	    ptrBlock[(block-10)*4+2] = (unsigned char)(address >> 8);
-	    ptrBlock[(block-10)*4+3] = (unsigned char)(address);
-
-	    fileSystem->write(ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
-	}
-	else {
+			// Pick an address for the indirectBlock
+			indirectBlock = fileSystem->allocateBlock();
+			if(indirectBlock < 0 ) {
+				return; // Maybe we should exit?
+			}
+			
+			// Initialize all the ptrs in indirectBlock to NOT_A_BLACK
+			for(int i = 0; i < size; i++) {
+				ptrBlock[i] = NOT_A_BLOCK;
+			}
+		} else {
+			 // Read in the current indirectBlock
+	   		 fileSystem->read((char*)ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
+		}
+	    ptrBlock[block] = address;
+	    fileSystem->write((char*)ptrBlock, fileSystem->getDataBlockOffset() + indirectBlock);
+	} else {
 	    cout << "Invalid block" << endl;
 	}
 }
