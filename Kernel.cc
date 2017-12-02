@@ -1419,8 +1419,7 @@ int Kernel::link(char *oldpath, char *newpath) {
 	    int status = 0;
 	    DirectoryEntry newDirectoryEntry(sourceInodeNumber, name);
 	    DirectoryEntry currentDirectoryEntry;
-	    while(true)
-	    {
+	    while(true) {
 		// Read an entry from the directory
 		status = readdir(dir, currentDirectoryEntry);
 		if(status < 0) {
@@ -1482,7 +1481,7 @@ int Kernel::link(char *oldpath, char *newpath) {
 }
 
 
-int Kernel::unlink(const char *pathname) {
+int Kernel::unlink(char *pathname) {
 
         FileSystem * fileSystem = openFileSystems;
 
@@ -1490,6 +1489,15 @@ int Kernel::unlink(const char *pathname) {
 	char *fullPath = getFullPath(pathname);
 	IndexNode inode;
 	short inodeNumber = findIndexNode(fullPath, inode);
+	
+	// If it's a directory, we can't unlink it
+        if((inode.getMode() & S_IFMT ) == S_IFDIR) {
+	    process.errno = EISDIR;
+	    return -1 ;
+	}
+
+	// Redo this b/c something changes fullNewPath as side effect
+	fullPath = getFullPath(pathname);
 
 	char dirname[1024];
 	memset(dirname, '\0', 1024);
@@ -1499,12 +1507,6 @@ int Kernel::unlink(const char *pathname) {
 	token = strtok(fullPath, "/");
 	char name[512];
 	memset(name, '\0', 512);
-
-	// if it's a directory, we can't unlink it
-        if((inode.getMode() & S_IFMT ) == S_IFDIR) {
-	    process.errno = EISDIR ;
-	    return -1 ;
-	}
 
 	// Now we need to delete the directory entry
 	// Find the name of the file and the directory that its in
@@ -1520,7 +1522,7 @@ int Kernel::unlink(const char *pathname) {
 		strcat(dirname, "/");
 	    }
 	}
-
+	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
 	int dir = open(dirname , O_RDWR);
 	if( dir < 0 ) {
@@ -1545,6 +1547,7 @@ int Kernel::unlink(const char *pathname) {
 	    }
 	    else {
 		if(!strcmp(currentDirectoryEntry.getName(), name)) {
+		    cout << "Name: " << currentDirectoryEntry.getName() << endl;
 		    break;
 		}
 	    }
@@ -1586,9 +1589,9 @@ int Kernel::unlink(const char *pathname) {
 	}
 
 	// Now we need to free the blocks - if nlinks==0
-	int nlinks = inode->getNLinks()-1;
+	int nlinks = inode.getNlink()-1;
 	if(nlinks > 0)
-	    inode->setNLinks(nlinks);
+	    inode.setNlink(nlinks);
 	else {
 	    // free any blocks currently allocated to the file
 	    int blockSize = fileSystem->getBlockSize();
