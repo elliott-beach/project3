@@ -89,6 +89,7 @@ class Kernel
 
 		static int link(char *oldpath, char *newpath);
 		static int unlink(char *pathname);
+		static int fsck();
 
 	private:
 		static ProcessContext process;

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cstdlib>
+#include <map>
+#include <stack>
 
 /**
  * Prints a system error message.  The actual text written
@@ -591,8 +593,7 @@ int Kernel::open(FileDescriptor * fileDescriptor )
 		}
 	}
 
-	if(fd == -1)
-	{
+	if(fd == -1){ // Too many open files.
 		// remove the file from the kernel list
 		openFiles[kfd] = NULL;
 		// return (EMFILE) if there isn't room left
@@ -1228,8 +1229,7 @@ char * Kernel::getFullPath( char * pathname )
 	return fullPath ;
 }
 
-IndexNode * Kernel::getRootIndexNode()
-{
+IndexNode * Kernel::getRootIndexNode(){
 	//if( rootIndexNode == null )
 	return openFileSystems->getRootIndexNode() ;
 }
@@ -1480,6 +1480,83 @@ int Kernel::link(char *oldpath, char *newpath) {
 	return 0;
 }
 
+// Scan the file system for errors.
+int Kernel::fsck(){
+	FileSystem * fileSystem = openFileSystems;
+
+	
+	
+
+
+	/*
+	* Add up the counts on all the inodes by traversing the tree of files using DFS.
+	* If inodes occur multiple times, they are only traversed once, which is achieved
+	* by tracking them in a hashtable.
+	* Nlinks should be the number of directories that contain the inode number, aside
+	* from the directory itself.
+	*/
+
+	std::map<int, int> inodeLinkCounts;
+	std::map<int, int> expectedLinkCounts;
+	std::stack<int> inodeStack;
+	inodeStack.push(FileSystem::ROOT_INDEX_NODE_NUMBER);
+	inodeLinkCounts[FileSystem::ROOT_INDEX_NODE_NUMBER] = 0;
+	
+	while(!inodeStack.empty()){
+		
+		int inodeNum = inodeStack.top();
+		inodeStack.pop();
+		
+		IndexNode inode;
+		fileSystem->readIndexNode(&inode, inodeNum);
+
+		expectedLinkCounts[inodeNum] = inode.getNlink();
+	
+		// If the file is a directory:
+		if ((inode.getMode() & S_IFMT) == S_IFDIR) {
+
+			// Open the directory.
+			int fd = open(new FileDescriptor(fileSystem, inode, O_RDONLY));
+			if (fd < 0){
+				cout << "opening node " << inodeNum << " failed" << endl;
+				cout << "errno " << process.errno << endl;
+				Kernel::exit(1);
+			}
+
+			// Recurse through each file in the directory.
+			DirectoryEntry dirEntry;
+			int status = readdir(fd, dirEntry);
+			for(; status > 0; status = readdir(fd, dirEntry)){
+				int nextNumber = dirEntry.getIno();
+				char* name = dirEntry.getName();
+				cout << "found " << name << " " << nextNumber << endl;
+
+				if(inodeLinkCounts.find(nextNumber) == inodeLinkCounts.end()){
+					inodeStack.push(nextNumber);
+					inodeLinkCounts[nextNumber] = 0;
+				}
+				
+				if(strcmp(name, ".")){ // Ignore the "." link that each directory has to itself.
+					inodeLinkCounts[nextNumber] += 1;
+				}
+				
+			}
+			close(fd);
+		}
+	}
+
+	// Check the counts.
+	map<int, int>::iterator it;
+	for (it = inodeLinkCounts.begin(); it != inodeLinkCounts.end(); it++){
+		int inodeNumber = it->first;
+		if(expectedLinkCounts[inodeNumber] != inodeLinkCounts[inodeNumber]){
+			cout << "error: inode " << inodeNumber << " has " << inodeLinkCounts[inodeNumber] 
+			<< " links but nLinks is set to " << expectedLinkCounts[inodeNumber] << endl; 
+		}
+	}
+
+	return 0;
+}
 
 int Kernel::unlink(char *pathname) {
 
