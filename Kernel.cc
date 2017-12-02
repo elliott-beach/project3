@@ -1480,13 +1480,17 @@ int Kernel::link(char *oldpath, char *newpath) {
 	return 0;
 }
 
+// For test purposes, corrupt the filesystem.
+int Kernel::corrupt(){
+	IndexNode root;
+	openFileSystems->readIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
+	root.setNlink(17 + root.getNlink());
+	openFileSystems->writeIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
+}
+
 // Scan the file system for errors.
 int Kernel::fsck(){
 	FileSystem * fileSystem = openFileSystems;
-
-	
-	
-
 
 	/*
 	* Add up the counts on all the inodes by traversing the tree of files using DFS.
@@ -1527,19 +1531,14 @@ int Kernel::fsck(){
 			DirectoryEntry dirEntry;
 			int status = readdir(fd, dirEntry);
 			for(; status > 0; status = readdir(fd, dirEntry)){
-				int nextNumber = dirEntry.getIno();
-				char* name = dirEntry.getName();
-				cout << "found " << name << " " << nextNumber << endl;
-
-				if(inodeLinkCounts.find(nextNumber) == inodeLinkCounts.end()){
-					inodeStack.push(nextNumber);
-					inodeLinkCounts[nextNumber] = 0;
+				int nextInodeNumber = dirEntry.getIno();
+				if(inodeLinkCounts.find(nextInodeNumber) == inodeLinkCounts.end()){
+					inodeStack.push(nextInodeNumber);
+					inodeLinkCounts[nextInodeNumber] = 0;
 				}
-				
-				if(strcmp(name, ".")){ // Ignore the "." link that each directory has to itself.
-					inodeLinkCounts[nextNumber] += 1;
+				if(!!strcmp(dirEntry.getName(), ".")){ // Ignore the "." link that each directory has to itself.
+					inodeLinkCounts[nextInodeNumber] += 1;
 				}
-				
 			}
 			close(fd);
 		}
