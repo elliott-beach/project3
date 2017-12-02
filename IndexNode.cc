@@ -118,7 +118,7 @@ int IndexNode::getBlockAddress(int block)
 	else if(indirectBlock == NOT_A_BLOCK) {
 	    return indirectBlock;
 	}
-	else if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
+	else if(block < fileSystem->maxBlockNumber()) {
 	    int blockSize = fileSystem->getBlockSize();
 	    char ptrBlock[blockSize];
 	    // Read in the current indirectBlock and then read the address
@@ -146,7 +146,7 @@ void IndexNode::setBlockAddress(int block, int address) // Take in a filesystem 
 		return;
 	}
 
-	if(block < fileSystem->getBlockSize() + MAX_DIRECT_BLOCKS) {
+	if(block < fileSystem->maxBlockNumber()) {
 	    int blockSize = fileSystem->getBlockSize();
 		int size = blockSize / sizeof(int); // blockSize should definitely be a multiple of 4, otherwise this might not work.
 		int ptrBlock[size];
