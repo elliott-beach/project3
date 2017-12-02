@@ -31,22 +31,11 @@ int main(int argc, char ** argv)
 	for(int i=1;i<argc;i++) {
 		strcpy(name, argv[i]);
 
-		// open the file for reading
-		int in_fd = Kernel::open(name, Kernel::O_RDONLY);
-		if(in_fd < 0) {
-		    Kernel::perror(PROGRAM_NAME);
-		    cout << PROGRAM_NAME <<" : unable to open input file " << name;
-		    Kernel::exit(2);
-		}
-
 		int res = Kernel::unlink(name);
 		if(res < 0) {
 		    Kernel::perror(PROGRAM_NAME);
 		    cout << PROGRAM_NAME <<" : Can't unlink directory " << name << endl;;
 		    Kernel::exit(3);
 		}
-
-		// close the input file
-		Kernel::close( in_fd );
 	}
 }
