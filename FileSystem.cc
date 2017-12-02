@@ -68,6 +68,11 @@ int FileSystem::getDataBlockOffset()
 	return dataBlockOffset ;
 }
 
+// Max Block Number when using singly indirect block structure.
+int FileSystem::maxBlockNumber(){
+	return IndexNode::MAX_DIRECT_BLOCKS + blockSize / sizeof(int);
+}
+
 /**
  * Get the rootIndexNode for this FileSystem.
  * @return the root index node

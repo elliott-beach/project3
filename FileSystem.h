@@ -39,6 +39,7 @@ class FileSystem
 		FileSystem(char * newFilename, char * newMode);
 		~FileSystem();
 		short getBlockSize();
+		int maxBlockNumber();
 		int getFreeListBlockOffset();
 		int getInodeBlockOffset();
 		int getDataBlockOffset();
