@@ -4,6 +4,7 @@
 #include "Kernel.h"
 #include <stdlib.h>
 #include <string.h>
+#include <map>
 
 FileSystem::FileSystem(char * newFilename, char * newMode)
 {
@@ -66,11 +67,6 @@ int FileSystem::getInodeBlockOffset()
 int FileSystem::getDataBlockOffset()
 {
 	return dataBlockOffset ;
-}
-
-// Max Block Number when using singly indirect block structure.
-int FileSystem::maxBlockNumber(){
-	return IndexNode::MAX_DIRECT_BLOCKS + blockSize / sizeof(int);
 }
 
 /**
@@ -239,6 +235,23 @@ int FileSystem::allocateBlock()
 		}
 	}
 }
+
+void FileSystem::scanBlocks(map<int,int> &allocatedBlocs){
+	for(int i = 0; i < blockCount; i++){
+		if(!isBlockFree(i) && allocatedBlocs.find(i) == allocatedBlocs.end()){
+			cout << "error: block " << i
+			<< " is not mentioned in inodes but is marked as allocated"
+			<< endl;
+		}
+	}
+}
+
+// Max Block Number when using singly indirect block structure.
+int FileSystem::maxBlockNumber(){
+       return IndexNode::MAX_DIRECT_BLOCKS + blockSize / sizeof(int);
+}
+
+
 
 /**
  * Loads the block containing the specified data block bit into

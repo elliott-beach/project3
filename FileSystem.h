@@ -4,6 +4,7 @@
 #include "BitBlock.h"
 #include <iostream>
 #include <fstream>
+#include <map>
 
 using namespace std;
 
@@ -52,6 +53,7 @@ class FileSystem{
 		void freeBlock( int dataBlockNumber );
 		int allocateBlock();
 		bool isBlockFree(int blockNumber);
+		void scanBlocks(map<int,int> &allocatedBlocks);
 
 		short allocateIndexNode();
 		void readIndexNode(IndexNode * indexNode , short indexNodeNumber);
