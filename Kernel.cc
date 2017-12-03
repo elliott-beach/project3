@@ -1510,6 +1510,7 @@ int Kernel::fsck(){
 	std::map<int, int> expectedLinkCounts;
 	std:map<int, int> allocatedBlocks;
 	std::stack<int> inodeStack;
+	
 	inodeStack.push(FileSystem::ROOT_INDEX_NODE_NUMBER);
 	inodeLinkCounts[FileSystem::ROOT_INDEX_NODE_NUMBER] = 0;
 	
@@ -1524,17 +1525,14 @@ int Kernel::fsck(){
 		expectedLinkCounts[inodeNum] = inode.getNlink();
 
 		// Make sure that all blocks mentioned are marked as allocated blocks.
-		// TODO: also check indirect block of the inode.
-	    int blockSize = fileSystem->getBlockSize();
-	    int blocks = (inode.getSize() + blockSize-1) / blockSize;
-	    for(int i = 0; i < blocks; i++) {
-			int address = inode.getBlockAddress(i);
-			if(address != FileSystem::NOT_A_BLOCK){
-				allocatedBlocks[address] = 1;
-			}
-			if(address != FileSystem::NOT_A_BLOCK && fileSystem->isBlockFree(address)) {
+		stack<int> blocks;
+		inode.getBlocks(blocks);
+		while(!blocks.empty()){
+			int addr = blocks.top(); blocks.pop();
+			allocatedBlocks[addr] = 1;
+			if(fileSystem->isBlockFree(addr)){
 				cout << "error: inode " << inodeNum << " uses block " <<
-				address << " which is marked as free " << endl; 
+				addr << " which is marked as free " << endl; 
 			}
 		}
 	

@@ -3,6 +3,7 @@
 #include "IndexNode.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stack>
 
 #define NOT_A_BLOCK 0x00FFFFFF
 
@@ -127,6 +128,21 @@ int IndexNode::getBlockAddress(int block)
 	}
 	else {
 	    cout << "Invalid block" << endl;
+	}
+}
+
+// Get all blocks used by the inode
+void IndexNode::getBlocks(stack<int> &output_stack){
+	int blockSize =  Kernel::openFileSystems->getBlockSize();
+	int blocks = (getSize() + blockSize-1) / blockSize;
+	for(int i=0; i < blocks; i++){
+		int addr = getBlockAddress(i);
+		if(addr != NOT_A_BLOCK){
+			output_stack.push(addr);
+		}
+	}
+	if(indirectBlock != NOT_A_BLOCK){
+			output_stack.push(indirectBlock);
 	}
 }
 
