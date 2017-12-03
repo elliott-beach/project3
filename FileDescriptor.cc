@@ -98,7 +98,6 @@ void FileDescriptor::setOffset(int newOffset)
 
 int FileDescriptor::readBlock(short relativeBlockNumber) 
 {
-	cout << "Block number is: " << relativeBlockNumber << endl;
 	if(relativeBlockNumber >= fileSystem->maxBlockNumber())
 	{
 		Kernel::setErrno(Kernel::EFBIG);

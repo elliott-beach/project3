@@ -4,6 +4,7 @@
 #include "Kernel.h"
 #include <stdlib.h>
 #include <string.h>
+#include <map>
 
 FileSystem::FileSystem(char * newFilename, char * newMode)
 {
@@ -66,11 +67,6 @@ int FileSystem::getInodeBlockOffset()
 int FileSystem::getDataBlockOffset()
 {
 	return dataBlockOffset ;
-}
-
-// Max Block Number when using singly indirect block structure.
-int FileSystem::maxBlockNumber(){
-	return IndexNode::MAX_DIRECT_BLOCKS + blockSize / sizeof(int);
 }
 
 /**
@@ -176,13 +172,22 @@ void FileSystem::write(char * bytes, int blockNumber)
  * @exception java.io.IOException if any exception occurs during an
  * operation on the underlying "file system" file.
  */
-void FileSystem::freeBlock(int dataBlockNumber)
-{
+void FileSystem::freeBlock(int dataBlockNumber){
 	loadFreeListBlock(dataBlockNumber);
 	freeListBitBlock->resetBit(dataBlockNumber % (blockSize * 8));
 
 	file.seekp((freeListBlockOffset+currentFreeListBlock)*blockSize);
 	freeListBitBlock->write(file);
+}
+
+/**
+ * Check whether a block is currently free.
+ * @param dataBlockNumber the data block to be checked.
+ */
+bool FileSystem::isBlockFree(int dataBlockNumber){
+	loadFreeListBlock(dataBlockNumber);
+	bool allocated = freeListBitBlock->isBitSet(dataBlockNumber % (blockSize * 8));
+	return !allocated;
 }
 
 /**
@@ -230,6 +235,23 @@ int FileSystem::allocateBlock()
 		}
 	}
 }
+
+void FileSystem::scanBlocks(map<int,int> &allocatedBlocs){
+	for(int i = 0; i < blockCount; i++){
+		if(!isBlockFree(i) && allocatedBlocs.find(i) == allocatedBlocs.end()){
+			cout << "error: block " << i
+			<< " is not mentioned in inodes but is marked as allocated"
+			<< endl;
+		}
+	}
+}
+
+// Max Block Number when using singly indirect block structure.
+int FileSystem::maxBlockNumber(){
+       return IndexNode::MAX_DIRECT_BLOCKS + blockSize / sizeof(int);
+}
+
+
 
 /**
  * Loads the block containing the specified data block bit into

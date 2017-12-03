@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cstdlib>
+#include <map>
+#include <stack>
 
 /**
  * Prints a system error message.  The actual text written
@@ -359,9 +361,7 @@ int Kernel::creat( char * pathname , short mode )
 
 		// close the directory
 		close(dir) ;
-	}
-	else
-	{
+	} else{
 		// file does exist ( indexNodeNumber >= 0 )
 
 		// if it's a directory, we can't truncate it
@@ -379,11 +379,9 @@ int Kernel::creat( char * pathname , short mode )
 		// free any blocks currently allocated to the file
 		int blockSize = fileSystem->getBlockSize();
 		int blocks = (currIndexNode.getSize() + blockSize-1) / blockSize;
-		for( int i = 0 ; i < blocks ; i ++ )
-		{
+		for( int i = 0 ; i < blocks ; i ++ ){
 			int address = currIndexNode.getBlockAddress(i) ;
-			if( address != FileSystem::NOT_A_BLOCK )
-			{
+			if( address != FileSystem::NOT_A_BLOCK ){
 				fileSystem->freeBlock(address);
 				currIndexNode.setBlockAddress(i , FileSystem::NOT_A_BLOCK);
 			}
@@ -591,8 +589,7 @@ int Kernel::open(FileDescriptor * fileDescriptor )
 		}
 	}
 
-	if(fd == -1)
-	{
+	if(fd == -1){ // Too many open files.
 		// remove the file from the kernel list
 		openFiles[kfd] = NULL;
 		// return (EMFILE) if there isn't room left
@@ -1228,8 +1225,7 @@ char * Kernel::getFullPath( char * pathname )
 	return fullPath ;
 }
 
-IndexNode * Kernel::getRootIndexNode()
-{
+IndexNode * Kernel::getRootIndexNode(){
 	//if( rootIndexNode == null )
 	return openFileSystems->getRootIndexNode() ;
 }
@@ -1312,7 +1308,8 @@ short Kernel::findNextIndexNode(FileSystem * fileSystem, IndexNode& indexNode , 
 	return indexNodeNumber ;
 }
 
-// get the inode for a file which is expected to exist
+// get the inode for a file which is expected to exist.
+// This modifies path.
 short Kernel::findIndexNode( char * path , IndexNode& inode )
 {
     
@@ -1480,6 +1477,108 @@ int Kernel::link(char *oldpath, char *newpath) {
 	return 0;
 }
 
+// For test purposes, corrupt the filesystem.
+int Kernel::corrupt(){
+	IndexNode root;
+	openFileSystems->readIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
+	root.setNlink(17 + root.getNlink());
+	openFileSystems->writeIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
+
+	// Make sure that all blocks mentioned are marked as allocated blocks.
+	// TODO: also check indirect block of the inode.
+	int blockSize = openFileSystems->getBlockSize();
+	int blocks = (root.getSize() + blockSize-1) / blockSize;
+	for(int i = 0; i < blocks; i++) {
+		int address = root.getBlockAddress(i);
+		openFileSystems->freeBlock(address);
+	}
+}
+
+// Scan the file system for errors.
+int Kernel::fsck(){
+	FileSystem * fileSystem = openFileSystems;
+
+	/*
+	* Add up the counts on all the inodes by traversing the tree of files using DFS.
+	* If inodes occur multiple times, they are only traversed once, which is achieved
+	* by tracking them in a hashtable.
+	* Nlinks should be the number of directories that contain the inode number, aside
+	* from the directory itself.
+	*/
+
+	std::map<int, int> inodeLinkCounts;
+	std::map<int, int> expectedLinkCounts;
+	std:map<int, int> allocatedBlocks;
+	std::stack<int> inodeStack;
+	inodeStack.push(FileSystem::ROOT_INDEX_NODE_NUMBER);
+	inodeLinkCounts[FileSystem::ROOT_INDEX_NODE_NUMBER] = 0;
+	
+	while(!inodeStack.empty()){
+		
+		int inodeNum = inodeStack.top();
+		inodeStack.pop();
+		
+		IndexNode inode;
+		fileSystem->readIndexNode(&inode, inodeNum);
+
+		expectedLinkCounts[inodeNum] = inode.getNlink();
+
+		// Make sure that all blocks mentioned are marked as allocated blocks.
+		// TODO: also check indirect block of the inode.
+	    int blockSize = fileSystem->getBlockSize();
+	    int blocks = (inode.getSize() + blockSize-1) / blockSize;
+	    for(int i = 0; i < blocks; i++) {
+			int address = inode.getBlockAddress(i);
+			if(address != FileSystem::NOT_A_BLOCK){
+				allocatedBlocks[address] = 1;
+			}
+			if(address != FileSystem::NOT_A_BLOCK && fileSystem->isBlockFree(address)) {
+				cout << "error: inode " << inodeNum << " uses block " <<
+				address << " which is marked as free " << endl; 
+			}
+		}
+	
+		// If the file is a directory:
+		if ((inode.getMode() & S_IFMT) == S_IFDIR) {
+
+			// Open the directory.
+			int fd = open(new FileDescriptor(fileSystem, inode, O_RDONLY));
+			if (fd < 0){
+				cout << "opening node " << inodeNum << " failed" << endl;
+				cout << "errno " << process.errno << endl;
+				Kernel::exit(1);
+			}
+
+			// Recurse through each file in the directory.
+			DirectoryEntry dirEntry;
+			int status = readdir(fd, dirEntry);
+			for(; status > 0; status = readdir(fd, dirEntry)){
+				int nextInodeNumber = dirEntry.getIno();
+				if(inodeLinkCounts.find(nextInodeNumber) == inodeLinkCounts.end()){
+					inodeStack.push(nextInodeNumber);
+					inodeLinkCounts[nextInodeNumber] = 0;
+				}
+				if(!!strcmp(dirEntry.getName(), ".")){ // Ignore the "." link that each directory has to itself.
+					inodeLinkCounts[nextInodeNumber] += 1;
+				}
+			}
+			close(fd);
+		}
+	}
+
+	// Verify that the nlinks counts are as expected.
+	for (map<int, int>::iterator it = inodeLinkCounts.begin(); it != inodeLinkCounts.end(); it++){
+		int inodeNumber = it->first;
+		if(expectedLinkCounts[inodeNumber] != inodeLinkCounts[inodeNumber]){
+			cout << "error: inode " << inodeNumber << " has " << inodeLinkCounts[inodeNumber] 
+			<< " links but nLinks is set to " << expectedLinkCounts[inodeNumber] << endl; 
+		}
+	}
+
+	openFileSystems->scanBlocks(allocatedBlocks);
+
+	return 0;
+}
 
 int Kernel::unlink(char *pathname) {
 
@@ -1510,18 +1609,18 @@ int Kernel::unlink(char *pathname) {
 
 	// Now we need to delete the directory entry
 	// Find the name of the file and the directory that its in
-	while(1) {
+	while(true) {
 	    if(token != NULL) {
-		memset(name, '\0', 512);
-		strcpy(name, token);
-	    } else
-		break;
+			memset(name, '\0', 512);
+			strcpy(name, token);
+	    } else break;
 	    token = strtok(NULL, "/");
 	    if(token != NULL) {
-		strcat(dirname, name);	
-		strcat(dirname, "/");
+			strcat(dirname, name);	
+			strcat(dirname, "/");
 	    }
 	}
+
 	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
 	int dir = open(dirname , O_RDWR);
@@ -1538,57 +1637,49 @@ int Kernel::unlink(char *pathname) {
 	    // Read an entry from the directory
 	    status = readdir(dir, currentDirectoryEntry);
 	    if(status < 0) {
-		cout << PROGRAM_NAME << ": error reading directory in creat";
-		exit( EXIT_FAILURE ) ;
-	    }
-	    else if( status == 0 ) {
-		// The file was not found
-		return -1;
-	    }
-	    else {
-		if(!strcmp(currentDirectoryEntry.getName(), name)) {
+			cout << PROGRAM_NAME << ": error reading directory in creat";
+			exit( EXIT_FAILURE ) ;
+	    } else if( status == 0 ) {// The file was not found
+			return -1;
+	    } else if(!strcmp(currentDirectoryEntry.getName(), name)) {
 		    cout << "Name: " << currentDirectoryEntry.getName() << endl;
 		    break;
 		}
-	    }
 	}
 	// Shift over all the directory entries to effectively delete it
 	while(true) {
 	    status = readdir(dir, currentDirectoryEntry);
 	    if(status < 0) {
-		cout << PROGRAM_NAME << ": error reading directory in creat";
-		exit( EXIT_FAILURE ) ;
-	    }
-	    else if(status == 0) {
-		// TODO: Check if the file is open by an process. If so, mark it so its blocks
-		// will be freed when the last process closes.
-		
-		// Finished shifting everything, shrink the size of the directory
-		FileDescriptor *file = process.openFiles[dir] ;
-		file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
-		break;
-	    }
-	    else {
-		// Seek backwards two entries, to where we want to shift it
-		int seek_status = lseek(dir , -2*DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-		if(seek_status < 0) {
-		    cout << PROGRAM_NAME << ": error during seek in creat";
-		    exit( EXIT_FAILURE );
-		}
+			cout << PROGRAM_NAME << ": error reading directory in creat";
+			exit( EXIT_FAILURE ) ;
+	    } else if(status == 0) {
+			// TODO: Check if the file is open by an process. If so, mark it so its blocks
+			// will be freed when the last process closes.
+			
+			// Finished shifting everything, shrink the size of the directory
+			FileDescriptor *file = process.openFiles[dir] ;
+			file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
+			break;
+	    } else {
+			// Seek backwards two entries, to where we want to shift it
+			int seek_status = lseek(dir , -2*DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if(seek_status < 0) {
+				cout << PROGRAM_NAME << ": error during seek in creat";
+				exit( EXIT_FAILURE );
+			}
+			
+			writedir(dir, currentDirectoryEntry);
 
-		writedir(dir, currentDirectoryEntry);
-
-		// Seek forward past the one that was just written
-		seek_status = lseek(dir , DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-		if(seek_status < 0) {
-		    cout << PROGRAM_NAME << ": error during seek in creat";
-		    exit( EXIT_FAILURE );
-		}
+			// Seek forward past the one that was just written
+			seek_status = lseek(dir , DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if(seek_status < 0) {
+				cout << PROGRAM_NAME << ": error during seek in creat";
+				exit( EXIT_FAILURE );
+			}
 	    }
-
 	}
 
-	// Now we need to free the blocks - if nlinks==0
+	// Now we need to free the blocks, if nlinks == 0
 	int nlinks = inode.getNlink()-1;
 	if(nlinks > 0)
 	    inode.setNlink(nlinks);
