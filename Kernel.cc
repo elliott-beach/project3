@@ -1578,19 +1578,19 @@ int Kernel::fsck(){
 	return 0;
 }
 
-int Kernel::unlink(char *pathname) {
+int Kernel::unlink(char *pathname){
 
-        FileSystem * fileSystem = openFileSystems;
+	FileSystem *fileSystem = openFileSystems;
 
-      	// Get the full path of pathname
+	// Get the full path of pathname
 	char *fullPath = getFullPath(pathname);
 	IndexNode inode;
 	short inodeNumber = findIndexNode(fullPath, inode);
-	
+
 	// If it's a directory, we can't unlink it
-        if((inode.getMode() & S_IFMT ) == S_IFDIR) {
-	    process.errno = EISDIR;
-	    return -1 ;
+	if ((inode.getMode() & S_IFMT) == S_IFDIR){
+		process.errno = EISDIR;
+		return -1;
 	}
 
 	// Redo this b/c something changes fullNewPath as side effect
@@ -1607,96 +1607,96 @@ int Kernel::unlink(char *pathname) {
 
 	// Now we need to delete the directory entry
 	// Find the name of the file and the directory that its in
-	while(true) {
-	    if(token != NULL) {
+	while (true){
+		if (token != NULL){
 			memset(name, '\0', 512);
 			strcpy(name, token);
-	    } else break;
-	    token = strtok(NULL, "/");
-	    if(token != NULL) {
-			strcat(dirname, name);	
+		}else break;
+		token = strtok(NULL, "/");
+		if (token != NULL){
+			strcat(dirname, name);
 			strcat(dirname, "/");
-	    }
+		}
 	}
 
 	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
-	int dir = open(dirname , O_RDWR);
-	if( dir < 0 ) {
-	    perror(PROGRAM_NAME);
-	    cout << PROGRAM_NAME << ": unable to open directory for writing" << endl;
-	    return -1;
+	int dir = open(dirname, O_RDWR);
+	if (dir < 0) {
+		perror(PROGRAM_NAME);
+		cout << PROGRAM_NAME << ": unable to open directory for writing" << endl;
+		return -1;
 	}
 
-	// Scan past the directory entries 
+	// Scan past the directory entries
 	int status = 0;
 	DirectoryEntry currentDirectoryEntry;
-	while(true) {
-	    // Read an entry from the directory
-	    status = readdir(dir, currentDirectoryEntry);
-	    if(status < 0) {
+	while (true) {
+		// Read an entry from the directory
+		status = readdir(dir, currentDirectoryEntry);
+		if (status < 0) {
 			cout << PROGRAM_NAME << ": error reading directory in creat";
-			exit( EXIT_FAILURE ) ;
-	    } else if( status == 0 ) {// The file was not found
+			exit(EXIT_FAILURE);
+		} else if (status == 0){ // The file was not found
 			return -1;
-	    } else if(!strcmp(currentDirectoryEntry.getName(), name)) {
-		    cout << "Name: " << currentDirectoryEntry.getName() << endl;
-		    break;
+		} else if (!strcmp(currentDirectoryEntry.getName(), name)) {
+			cout << "Name: " << currentDirectoryEntry.getName() << endl;
+			break;
 		}
 	}
 	// Shift over all the directory entries to effectively delete it
-	while(true) {
-	    status = readdir(dir, currentDirectoryEntry);
-	    if(status < 0) {
+	while (true) {
+		status = readdir(dir, currentDirectoryEntry);
+		if (status < 0) {
 			cout << PROGRAM_NAME << ": error reading directory in creat";
-			exit( EXIT_FAILURE ) ;
-	    } else if(status == 0) {
+			exit(EXIT_FAILURE);
+		} else if (status == 0){
 			// TODO: Check if the file is open by an process. If so, mark it so its blocks
 			// will be freed when the last process closes.
-			
+
 			// Finished shifting everything, shrink the size of the directory
-			FileDescriptor *file = process.openFiles[dir] ;
+			FileDescriptor *file = process.openFiles[dir];
 			file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
 			break;
-	    } else {
+		} else {
 			// Seek backwards two entries, to where we want to shift it
-			int seek_status = lseek(dir , -2*DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-			if(seek_status < 0) {
+			int seek_status = lseek(dir, -2 * DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if (seek_status < 0) {
 				cout << PROGRAM_NAME << ": error during seek in creat";
-				exit( EXIT_FAILURE );
+				exit(EXIT_FAILURE);
 			}
-			
+
 			writedir(dir, currentDirectoryEntry);
 
 			// Seek forward past the one that was just written
-			seek_status = lseek(dir , DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-			if(seek_status < 0) {
+			seek_status = lseek(dir, DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if (seek_status < 0) {
 				cout << PROGRAM_NAME << ": error during seek in creat";
-				exit( EXIT_FAILURE );
+				exit(EXIT_FAILURE);
 			}
-	    }
+		}
 	}
 
 	// Now we need to free the blocks, if nlinks == 0
-	int nlinks = inode.getNlink()-1;
-	if(nlinks > 0)
-	    inode.setNlink(nlinks);
+	int nlinks = inode.getNlink() - 1;
+	if (nlinks > 0)
+		inode.setNlink(nlinks);
 	else {
-	    // free any blocks currently allocated to the file
-	    int blockSize = fileSystem->getBlockSize();
-	    int blocks = (inode.getSize() + blockSize-1) / blockSize;
-	    for(int i = 0 ; i < blocks ;i++) {
-		int address = inode.getBlockAddress(i) ;
-		if(address != FileSystem::NOT_A_BLOCK) {
-		    fileSystem->freeBlock(address);
-		    inode.setBlockAddress(i , FileSystem::NOT_A_BLOCK);
+		// free any blocks currently allocated to the file
+		int blockSize = fileSystem->getBlockSize();
+		int blocks = (inode.getSize() + blockSize - 1) / blockSize;
+		for (int i = 0; i < blocks; i++) {
+			int address = inode.getBlockAddress(i);
+			if (address != FileSystem::NOT_A_BLOCK) {
+				fileSystem->freeBlock(address);
+				inode.setBlockAddress(i, FileSystem::NOT_A_BLOCK);
+			}
 		}
-	    }
 
-	    // update the inode to size 0
-	    inode.setSize(0);
+		// update the inode to size 0
+		inode.setSize(0);
 
-	    // write the inode to the file system.
-	    fileSystem->writeIndexNode(&inode, inodeNumber);
+		// write the inode to the file system.
+		fileSystem->writeIndexNode(&inode, inodeNumber);
 	}
 }
