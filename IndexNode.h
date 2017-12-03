@@ -51,6 +51,7 @@ class IndexNode
 		void read(char * buffer, int offset);
 		char * toString();
 		void copy(IndexNode& indexNode);
+		void free(int inodeNumber);
 		void getBlocks(stack<int> &output_stack);
 };
 #endif

@@ -1619,7 +1619,6 @@ int Kernel::unlink(char *pathname){
 		}
 	}
 
-	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
 	int dir = open(dirname, O_RDWR);
 	if (dir < 0) {
@@ -1640,7 +1639,6 @@ int Kernel::unlink(char *pathname){
 		} else if (status == 0){ // The file was not found
 			return -1;
 		} else if (!strcmp(currentDirectoryEntry.getName(), name)) {
-			cout << "Name: " << currentDirectoryEntry.getName() << endl;
 			break;
 		}
 	}
@@ -1676,27 +1674,11 @@ int Kernel::unlink(char *pathname){
 			}
 		}
 	}
-
 	// Now we need to free the blocks, if nlinks == 0
 	int nlinks = inode.getNlink() - 1;
 	if (nlinks > 0)
 		inode.setNlink(nlinks);
 	else {
-		// free any blocks currently allocated to the file
-		int blockSize = fileSystem->getBlockSize();
-		int blocks = (inode.getSize() + blockSize - 1) / blockSize;
-		for (int i = 0; i < blocks; i++) {
-			int address = inode.getBlockAddress(i);
-			if (address != FileSystem::NOT_A_BLOCK) {
-				fileSystem->freeBlock(address);
-				inode.setBlockAddress(i, FileSystem::NOT_A_BLOCK);
-			}
-		}
-
-		// update the inode to size 0
-		inode.setSize(0);
-
-		// write the inode to the file system.
-		fileSystem->writeIndexNode(&inode, inodeNumber);
+		inode.free(inodeNumber);	
 	}
 }

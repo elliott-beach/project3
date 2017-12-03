@@ -146,6 +146,32 @@ void IndexNode::getBlocks(stack<int> &output_stack){
 	}
 }
 
+// Free all blocks used by this inode.
+void IndexNode::free(int inodeNumber){
+	FileSystem* fileSystem = Kernel::openFileSystems;
+
+	// Free any blocks currently allocated to the inode.
+	int blockSize = fileSystem->getBlockSize();
+	int blocks = (getSize() + blockSize - 1) / blockSize;
+	for (int i = 0; i < blocks; i++) {
+		int address = getBlockAddress(i);
+		if (address != NOT_A_BLOCK) {
+			fileSystem->freeBlock(address);
+			setBlockAddress(i, NOT_A_BLOCK);
+		}
+	}
+
+	// Free the indirect block.
+	if (indirectBlock != NOT_A_BLOCK) {
+		fileSystem->freeBlock(indirectBlock);
+		indirectBlock = NOT_A_BLOCK;
+	}
+
+	setSize(0);
+
+	fileSystem->writeIndexNode(this, inodeNumber);
+}
+
 /**
  * Sets the address corresponding to the specified sequential
  * block of the file.
