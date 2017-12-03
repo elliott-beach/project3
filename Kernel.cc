@@ -361,9 +361,7 @@ int Kernel::creat( char * pathname , short mode )
 
 		// close the directory
 		close(dir) ;
-	}
-	else
-	{
+	} else{
 		// file does exist ( indexNodeNumber >= 0 )
 
 		// if it's a directory, we can't truncate it
@@ -381,11 +379,9 @@ int Kernel::creat( char * pathname , short mode )
 		// free any blocks currently allocated to the file
 		int blockSize = fileSystem->getBlockSize();
 		int blocks = (currIndexNode.getSize() + blockSize-1) / blockSize;
-		for( int i = 0 ; i < blocks ; i ++ )
-		{
+		for( int i = 0 ; i < blocks ; i ++ ){
 			int address = currIndexNode.getBlockAddress(i) ;
-			if( address != FileSystem::NOT_A_BLOCK )
-			{
+			if( address != FileSystem::NOT_A_BLOCK ){
 				fileSystem->freeBlock(address);
 				currIndexNode.setBlockAddress(i , FileSystem::NOT_A_BLOCK);
 			}
@@ -1312,7 +1308,8 @@ short Kernel::findNextIndexNode(FileSystem * fileSystem, IndexNode& indexNode , 
 	return indexNodeNumber ;
 }
 
-// get the inode for a file which is expected to exist
+// get the inode for a file which is expected to exist.
+// This modifies path.
 short Kernel::findIndexNode( char * path , IndexNode& inode )
 {
     
@@ -1486,6 +1483,15 @@ int Kernel::corrupt(){
 	openFileSystems->readIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
 	root.setNlink(17 + root.getNlink());
 	openFileSystems->writeIndexNode(&root, FileSystem::ROOT_INDEX_NODE_NUMBER);
+
+	// Make sure that all blocks mentioned are marked as allocated blocks.
+	// TODO: also check indirect block of the inode.
+	int blockSize = openFileSystems->getBlockSize();
+	int blocks = (root.getSize() + blockSize-1) / blockSize;
+	for(int i = 0; i < blocks; i++) {
+		int address = root.getBlockAddress(i);
+		openFileSystems->freeBlock(address);
+	}
 }
 
 // Scan the file system for errors.
@@ -1515,6 +1521,18 @@ int Kernel::fsck(){
 		fileSystem->readIndexNode(&inode, inodeNum);
 
 		expectedLinkCounts[inodeNum] = inode.getNlink();
+
+		// Make sure that all blocks mentioned are marked as allocated blocks.
+		// TODO: also check indirect block of the inode.
+	    int blockSize = fileSystem->getBlockSize();
+	    int blocks = (inode.getSize() + blockSize-1) / blockSize;
+	    for(int i = 0; i < blocks; i++) {
+			int address = inode.getBlockAddress(i) ;
+			if(address != FileSystem::NOT_A_BLOCK && fileSystem->isBlockFree(address)) {
+				cout << "error: inode " << inodeNum << " uses block " <<
+				address << " which is marked as free " << endl; 
+			}
+		}
 	
 		// If the file is a directory:
 		if ((inode.getMode() & S_IFMT) == S_IFDIR) {
@@ -1544,9 +1562,8 @@ int Kernel::fsck(){
 		}
 	}
 
-	// Check the counts.
-	map<int, int>::iterator it;
-	for (it = inodeLinkCounts.begin(); it != inodeLinkCounts.end(); it++){
+	// Verify that the nlinks counts are as expected.
+	for (map<int, int>::iterator it = inodeLinkCounts.begin(); it != inodeLinkCounts.end(); it++){
 		int inodeNumber = it->first;
 		if(expectedLinkCounts[inodeNumber] != inodeLinkCounts[inodeNumber]){
 			cout << "error: inode " << inodeNumber << " has " << inodeLinkCounts[inodeNumber] 
@@ -1586,18 +1603,18 @@ int Kernel::unlink(char *pathname) {
 
 	// Now we need to delete the directory entry
 	// Find the name of the file and the directory that its in
-	while(1) {
+	while(true) {
 	    if(token != NULL) {
-		memset(name, '\0', 512);
-		strcpy(name, token);
-	    } else
-		break;
+			memset(name, '\0', 512);
+			strcpy(name, token);
+	    } else break;
 	    token = strtok(NULL, "/");
 	    if(token != NULL) {
-		strcat(dirname, name);	
-		strcat(dirname, "/");
+			strcat(dirname, name);	
+			strcat(dirname, "/");
 	    }
 	}
+
 	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
 	int dir = open(dirname , O_RDWR);
@@ -1614,57 +1631,49 @@ int Kernel::unlink(char *pathname) {
 	    // Read an entry from the directory
 	    status = readdir(dir, currentDirectoryEntry);
 	    if(status < 0) {
-		cout << PROGRAM_NAME << ": error reading directory in creat";
-		exit( EXIT_FAILURE ) ;
-	    }
-	    else if( status == 0 ) {
-		// The file was not found
-		return -1;
-	    }
-	    else {
-		if(!strcmp(currentDirectoryEntry.getName(), name)) {
+			cout << PROGRAM_NAME << ": error reading directory in creat";
+			exit( EXIT_FAILURE ) ;
+	    } else if( status == 0 ) {// The file was not found
+			return -1;
+	    } else if(!strcmp(currentDirectoryEntry.getName(), name)) {
 		    cout << "Name: " << currentDirectoryEntry.getName() << endl;
 		    break;
 		}
-	    }
 	}
 	// Shift over all the directory entries to effectively delete it
 	while(true) {
 	    status = readdir(dir, currentDirectoryEntry);
 	    if(status < 0) {
-		cout << PROGRAM_NAME << ": error reading directory in creat";
-		exit( EXIT_FAILURE ) ;
-	    }
-	    else if(status == 0) {
-		// TODO: Check if the file is open by an process. If so, mark it so its blocks
-		// will be freed when the last process closes.
-		
-		// Finished shifting everything, shrink the size of the directory
-		FileDescriptor *file = process.openFiles[dir] ;
-		file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
-		break;
-	    }
-	    else {
-		// Seek backwards two entries, to where we want to shift it
-		int seek_status = lseek(dir , -2*DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-		if(seek_status < 0) {
-		    cout << PROGRAM_NAME << ": error during seek in creat";
-		    exit( EXIT_FAILURE );
-		}
+			cout << PROGRAM_NAME << ": error reading directory in creat";
+			exit( EXIT_FAILURE ) ;
+	    } else if(status == 0) {
+			// TODO: Check if the file is open by an process. If so, mark it so its blocks
+			// will be freed when the last process closes.
+			
+			// Finished shifting everything, shrink the size of the directory
+			FileDescriptor *file = process.openFiles[dir] ;
+			file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
+			break;
+	    } else {
+			// Seek backwards two entries, to where we want to shift it
+			int seek_status = lseek(dir , -2*DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if(seek_status < 0) {
+				cout << PROGRAM_NAME << ": error during seek in creat";
+				exit( EXIT_FAILURE );
+			}
+			
+			writedir(dir, currentDirectoryEntry);
 
-		writedir(dir, currentDirectoryEntry);
-
-		// Seek forward past the one that was just written
-		seek_status = lseek(dir , DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
-		if(seek_status < 0) {
-		    cout << PROGRAM_NAME << ": error during seek in creat";
-		    exit( EXIT_FAILURE );
-		}
+			// Seek forward past the one that was just written
+			seek_status = lseek(dir , DirectoryEntry::DIRECTORY_ENTRY_SIZE, 1);
+			if(seek_status < 0) {
+				cout << PROGRAM_NAME << ": error during seek in creat";
+				exit( EXIT_FAILURE );
+			}
 	    }
-
 	}
 
-	// Now we need to free the blocks - if nlinks==0
+	// Now we need to free the blocks, if nlinks == 0
 	int nlinks = inode.getNlink()-1;
 	if(nlinks > 0)
 	    inode.setNlink(nlinks);

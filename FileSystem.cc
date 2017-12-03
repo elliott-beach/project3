@@ -176,13 +176,22 @@ void FileSystem::write(char * bytes, int blockNumber)
  * @exception java.io.IOException if any exception occurs during an
  * operation on the underlying "file system" file.
  */
-void FileSystem::freeBlock(int dataBlockNumber)
-{
+void FileSystem::freeBlock(int dataBlockNumber){
 	loadFreeListBlock(dataBlockNumber);
 	freeListBitBlock->resetBit(dataBlockNumber % (blockSize * 8));
 
 	file.seekp((freeListBlockOffset+currentFreeListBlock)*blockSize);
 	freeListBitBlock->write(file);
+}
+
+/**
+ * Check whether a block is currently free.
+ * @param dataBlockNumber the data block to be checked.
+ */
+bool FileSystem::isBlockFree(int dataBlockNumber){
+	loadFreeListBlock(dataBlockNumber);
+	bool allocated = freeListBitBlock->isBitSet(dataBlockNumber % (blockSize * 8));
+	return !allocated;
 }
 
 /**
