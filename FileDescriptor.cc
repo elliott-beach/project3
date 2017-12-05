@@ -8,6 +8,7 @@ FileDescriptor::FileDescriptor(FileSystem * newFileSystem, IndexNode &newIndexNo
 	deviceNumber = -1 ;
 	indexNodeNumber = -1 ;
 	offset = 0 ;
+	freeWhenDone = false;
 	
 	flags = newFlags ;
 	fileSystem = newFileSystem;
@@ -94,7 +95,15 @@ void FileDescriptor::setOffset(int newOffset)
 	offset = newOffset;
 }
 
+bool FileDescriptor::getFreeWhenDone()
+{
+    return freeWhenDone;
+}
 
+void FileDescriptor::setFreeWhenDone()
+{
+    freeWhenDone = true;
+}
 
 int FileDescriptor::readBlock(short relativeBlockNumber) 
 {

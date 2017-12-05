@@ -129,14 +129,26 @@ int Kernel::close(int fd)
 		return status;
 	}
 
+	// Find out how many processes have this file open
+	int count = 0;
+	for(int i = 0; i < MAX_OPEN_FILES; ++i) {
+	    if(openFiles[i] == process.openFiles[fd])
+		count++;
+	}
+
 	// remove the file descriptor from the kernel's list of open files
-	for( int i = 0 ; i < MAX_OPEN_FILES ; i ++ )
-	{
-		if(openFiles[i] == process.openFiles[fd])
-		{
+	for( int i = 0 ; i < MAX_OPEN_FILES ; i ++ ) {
+		if(openFiles[i] == process.openFiles[fd]) {
+		        // If the flag is set and this is the last process with it
+			// open, free its blocks
+			if(openFiles[i]->getFreeWhenDone() && count == 1) {
+			    IndexNode *inode = openFiles[i]->getIndexNode();
+			    inode->free(openFiles[i]->getIndexNodeNumber());
+			}
 			delete openFiles[i];
 			openFiles[i] = NULL;
-			break ;
+
+			break;
 		}
 	}
 	// ??? is it an error if we didn't find the open file?
@@ -1586,13 +1598,14 @@ int Kernel::unlink(char *pathname) {
 
       	// Get the full path of pathname
 	char *fullPath = getFullPath(pathname);
+	int fd = open(fullPath, O_RDWR);
 	IndexNode inode;
 	short inodeNumber = findIndexNode(fullPath, inode);
 	
 	// If it's a directory, we can't unlink it
         if((inode.getMode() & S_IFMT ) == S_IFDIR) {
 	    process.errno = EISDIR;
-	    return -1 ;
+	    return -1;
 	}
 
 	// Redo this b/c something changes fullNewPath as side effect
@@ -1621,7 +1634,6 @@ int Kernel::unlink(char *pathname) {
 	    }
 	}
 
-	cout << "Dir: " << dirname << endl;
 	// Open the file's directory
 	int dir = open(dirname , O_RDWR);
 	if( dir < 0 ) {
@@ -1653,11 +1665,8 @@ int Kernel::unlink(char *pathname) {
 			cout << PROGRAM_NAME << ": error reading directory in creat";
 			exit( EXIT_FAILURE ) ;
 	    } else if(status == 0) {
-			// TODO: Check if the file is open by an process. If so, mark it so its blocks
-			// will be freed when the last process closes.
-			
 			// Finished shifting everything, shrink the size of the directory
-			FileDescriptor *file = process.openFiles[dir] ;
+			FileDescriptor *file = process.openFiles[dir];
 			file->setSize(file->getSize() - DirectoryEntry::DIRECTORY_ENTRY_SIZE);
 			break;
 	    } else {
@@ -1678,22 +1687,22 @@ int Kernel::unlink(char *pathname) {
 			}
 	    }
 	}
+	close(dir);
 
 	// Now we need to free the blocks, if nlinks == 0
 	int nlinks = inode.getNlink()-1;
 	if(nlinks > 0)
 	    inode.setNlink(nlinks);
 	else {
-	    // free any blocks currently allocated to the file
-	    int blockSize = fileSystem->getBlockSize();
-	    int blocks = (inode.getSize() + blockSize-1) / blockSize;
-	    for(int i = 0 ; i < blocks ;i++) {
-		int address = inode.getBlockAddress(i) ;
-		if(address != FileSystem::NOT_A_BLOCK) {
-		    fileSystem->freeBlock(address);
-		    inode.setBlockAddress(i , FileSystem::NOT_A_BLOCK);
-		}
+	    // Search openFiles array for the particular file descriptor (fd was initialized at top)
+	    // to see if any other processes have it open
+	    for(int i = 0; i < MAX_OPEN_FILES; ++i) {
+		if(openFiles[i] == process.openFiles[fd])
+		    openFiles[i]->setFreeWhenDone();
 	    }
+
+	    // Kernel::close will handle freeing all the blocks
+	    close(fd);
 
 	    // update the inode to size 0
 	    inode.setSize(0);

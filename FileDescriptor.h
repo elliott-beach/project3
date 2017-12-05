@@ -18,6 +18,7 @@ class FileDescriptor
 		int flags;
 		int offset;
 		char * bytes;
+		bool freeWhenDone;
 	
 	public:
 //		FileDescriptor( short newDeviceNumber , short newIndexNodeNumber , int newFlags);
@@ -35,6 +36,8 @@ class FileDescriptor
   		void setSize( int newSize );
   		short getBlockSize();
   		int getOffset();
+		bool getFreeWhenDone();
+		void setFreeWhenDone();
   		void setOffset( int newOffset );
   		int readBlock( short relativeBlockNumber ) ;
   		int writeBlock( short relativeBlockNumber ) ;
