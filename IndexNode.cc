@@ -3,6 +3,7 @@
 #include "IndexNode.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stack>
 
 #define NOT_A_BLOCK 0x00FFFFFF
 
@@ -128,6 +129,47 @@ int IndexNode::getBlockAddress(int block)
 	else {
 	    cout << "Invalid block" << endl;
 	}
+}
+
+// Get all blocks used by the inode
+void IndexNode::getBlocks(stack<int> &output_stack){
+	int blockSize =  Kernel::openFileSystems->getBlockSize();
+	int blocks = (getSize() + blockSize-1) / blockSize;
+	for(int i=0; i < blocks; i++){
+		int addr = getBlockAddress(i);
+		if(addr != NOT_A_BLOCK){
+			output_stack.push(addr);
+		}
+	}
+	if(indirectBlock != NOT_A_BLOCK){
+			output_stack.push(indirectBlock);
+	}
+}
+
+// Free all blocks used by this inode.
+void IndexNode::free(int inodeNumber){
+	FileSystem* fileSystem = Kernel::openFileSystems;
+
+	// Free any blocks currently allocated to the inode.
+	int blockSize = fileSystem->getBlockSize();
+	int blocks = (getSize() + blockSize - 1) / blockSize;
+	for (int i = 0; i < blocks; i++) {
+		int address = getBlockAddress(i);
+		if (address != NOT_A_BLOCK) {
+			fileSystem->freeBlock(address);
+			setBlockAddress(i, NOT_A_BLOCK);
+		}
+	}
+
+	// Free the indirect block.
+	if (indirectBlock != NOT_A_BLOCK) {
+		fileSystem->freeBlock(indirectBlock);
+		indirectBlock = NOT_A_BLOCK;
+	}
+
+	setSize(0);
+
+	fileSystem->writeIndexNode(this, inodeNumber);
 }
 
 /**

@@ -136,12 +136,18 @@ int Kernel::close(int fd)
 		count++;
 	}
 
+    if(process.openFiles[fd]->getFreeWhenDone()){
+        
+    }
+
 	// remove the file descriptor from the kernel's list of open files
 	for( int i = 0 ; i < MAX_OPEN_FILES ; i ++ ) {
-		if(openFiles[i] == process.openFiles[fd]) {
-		        // If the flag is set and this is the last process with it
+        cout << "file " << i << endl;
+		if(openFiles[i]->getIndexNodeNumber() == process.openFiles[fd]->getIndexNodeNumber()) {
+		    // If the flag is set and this is the last process with it
 			// open, free its blocks
-			if(openFiles[i]->getFreeWhenDone() && count == 1) {
+			if(process.openFiles[fd]->getFreeWhenDone()) {
+                cout << "freeing " << endl;
 			    IndexNode *inode = openFiles[i]->getIndexNode();
 			    inode->free(openFiles[i]->getIndexNodeNumber());
 			}
@@ -533,8 +539,13 @@ int Kernel::open( char * pathname , int flags )
 	// get the full path name
 	char * fullPath = getFullPath( pathname ) ;
 
+    cout << pathname << endl;
+    cout << fullPath << endl;
+
 	IndexNode indexNode;
 	short indexNodeNumber = findIndexNode(fullPath , indexNode);
+
+    cout << "in" << indexNodeNumber << endl;
 	
 	if( indexNodeNumber < 0 )
 	{
@@ -1594,12 +1605,11 @@ int Kernel::fsck(){
 
 int Kernel::unlink(char *pathname) {
 
-        FileSystem * fileSystem = openFileSystems;
+    FileSystem * fileSystem = openFileSystems;
 
-      	// Get the full path of pathname
-	char *fullPath = getFullPath(pathname);
-	int fd = open(fullPath, O_RDWR);
+	int fd = open(pathname, O_RDWR);
 	IndexNode inode;
+    char* fullPath = getFullPath(pathname);
 	short inodeNumber = findIndexNode(fullPath, inode);
 	
 	// If it's a directory, we can't unlink it
@@ -1689,6 +1699,8 @@ int Kernel::unlink(char *pathname) {
 	}
 	close(dir);
 
+    cout << "unlinking " << endl;
+
 	// Now we need to free the blocks, if nlinks == 0
 	int nlinks = inode.getNlink()-1;
 	if(nlinks > 0)
@@ -1696,11 +1708,9 @@ int Kernel::unlink(char *pathname) {
 	else {
 	    // Search openFiles array for the particular file descriptor (fd was initialized at top)
 	    // to see if any other processes have it open
-	    for(int i = 0; i < MAX_OPEN_FILES; ++i) {
-		if(openFiles[i] == process.openFiles[fd])
-		    openFiles[i]->setFreeWhenDone();
-	    }
-
+        cout << "setting it free " << fd << endl;
+        process.openFiles[fd]->setFreeWhenDone();
+	   
 	    // Kernel::close will handle freeing all the blocks
 	    close(fd);
 
