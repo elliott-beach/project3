@@ -87,6 +87,11 @@ class Kernel
 		static bool initialize();
 		static void finalize( int status );
 
+		static int link(char *oldpath, char *newpath);
+		static int unlink(char *pathname);
+		static int fsck();
+		static int corrupt();
+
 	private:
 		static ProcessContext process;
 		static int processCount;

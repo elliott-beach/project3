@@ -4,11 +4,11 @@
 #include "BitBlock.h"
 #include <iostream>
 #include <fstream>
+#include <map>
 
 using namespace std;
 
-class FileSystem
-{
+class FileSystem{
 	private:
 		fstream file;
 		char filename[256];
@@ -39,6 +39,7 @@ class FileSystem
 		FileSystem(char * newFilename, char * newMode);
 		~FileSystem();
 		short getBlockSize();
+		int maxBlockNumber();
 		int getFreeListBlockOffset();
 		int getInodeBlockOffset();
 		int getDataBlockOffset();
@@ -51,6 +52,8 @@ class FileSystem
 
 		void freeBlock( int dataBlockNumber );
 		int allocateBlock();
+		bool isBlockFree(int blockNumber);
+		void scanBlocks(map<int,int> &allocatedBlocks);
 
 		short allocateIndexNode();
 		void readIndexNode(IndexNode * indexNode , short indexNodeNumber);

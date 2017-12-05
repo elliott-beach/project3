@@ -1,4 +1,4 @@
-all: mkfs ls cat tee cp dump mkdir
+all: mkfs ls cat tee cp dump mkdir ln rm fsck
 
 cp: cp.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
 	g++ cp.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o cp
@@ -15,8 +15,17 @@ mkdir: mkdir.cc Stat.o FileDescriptor.o FileSystem.o BitBlock.o IndexNode.o Dire
 cat: cat.cc Stat.o FileDescriptor.o FileSystem.o BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o ProcessContext.o Kernel.o
 	g++ cat.cc Stat.o FileDescriptor.o FileSystem.o BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o ProcessContext.o Kernel.o -o cat
 
-mkfs: mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o
-	g++ mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o -o mkfs
+mkfs: mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o Kernel.o FileSystem.o FileDescriptor.o ProcessContext.o Stat.o
+	g++ mkfs.cc BitBlock.o IndexNode.o DirectoryEntry.o Block.o SuperBlock.o Kernel.o FileSystem.o FileDescriptor.o ProcessContext.o Stat.o -o mkfs
+
+ln: ln.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
+	g++ ln.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o ln
+
+rm: rm.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
+	g++ rm.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o rm
+
+fsck: fsck.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o
+	g++ fsck.cc Kernel.o IndexNode.o FileDescriptor.o DirectoryEntry.o ProcessContext.o FileSystem.o Stat.o BitBlock.o Block.o SuperBlock.o -o fsck
 
 dump: dump.cc
 	g++ dump.cc -o dump
@@ -29,7 +38,7 @@ ProcessContext.o: ProcessContext.cc
 
 FileDescriptor.o: FileDescriptor.cc
 	g++ -c FileDescriptor.cc
-	
+
 FileSystem.o: FileSystem.cc 
 	g++ -c FileSystem.cc 
 
@@ -52,5 +61,5 @@ SuperBlock.o: SuperBlock.cc
 	g++ -c SuperBlock.cc
 
 clean:
-	rm *.o mkfs ls cat tee cp dump mkdir
+	rm *.o mkfs ls cat tee cp dump mkdir ln rm
 
