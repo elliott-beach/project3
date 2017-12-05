@@ -132,29 +132,22 @@ int Kernel::close(int fd)
 	// Find out how many processes have this file open
 	int count = 0;
 	for(int i = 0; i < MAX_OPEN_FILES; ++i) {
-	    if(openFiles[i] == process.openFiles[fd])
+	    if(openFiles[i]->getIndexNodeNumber() == process.openFiles[fd]->getIndexNodeNumber())
 		count++;
 	}
 
-    if(process.openFiles[fd]->getFreeWhenDone()){
-        
+    // Free the file if it is wating to be freed and no more files are using it.
+    if(count <= 1 && process.openFiles[fd]->getFreeWhenDone()){
+         cout << "freeing " << endl;
+        IndexNode *inode = process.openFiles[fd]->getIndexNode();
+        inode->free(process.openFiles[fd]->getIndexNodeNumber());
     }
 
 	// remove the file descriptor from the kernel's list of open files
 	for( int i = 0 ; i < MAX_OPEN_FILES ; i ++ ) {
-        cout << "file " << i << endl;
-		if(openFiles[i]->getIndexNodeNumber() == process.openFiles[fd]->getIndexNodeNumber()) {
-		    // If the flag is set and this is the last process with it
-			// open, free its blocks
-			if(process.openFiles[fd]->getFreeWhenDone()) {
-                cout << "freeing " << endl;
-			    IndexNode *inode = openFiles[i]->getIndexNode();
-			    inode->free(openFiles[i]->getIndexNodeNumber());
-			}
+		if(openFiles[i] == process.openFiles[fd]) {
 			delete openFiles[i];
 			openFiles[i] = NULL;
-
-			break;
 		}
 	}
 	// ??? is it an error if we didn't find the open file?
@@ -1706,9 +1699,8 @@ int Kernel::unlink(char *pathname) {
 	if(nlinks > 0)
 	    inode.setNlink(nlinks);
 	else {
-	    // Search openFiles array for the particular file descriptor (fd was initialized at top)
-	    // to see if any other processes have it open
-        cout << "setting it free " << fd << endl;
+
+        // We know we want to free the file when done.
         process.openFiles[fd]->setFreeWhenDone();
 	   
 	    // Kernel::close will handle freeing all the blocks
