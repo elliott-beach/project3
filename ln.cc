@@ -34,15 +34,20 @@ int main(int argc, char ** argv)
 
 	// open the input file
 	int in_fd = Kernel::open(in_name , Kernel::O_RDONLY);
-
 	if(in_fd < 0) {
 		Kernel::perror(PROGRAM_NAME);
 		cout << PROGRAM_NAME << ": unable to open input file \"" << in_name << "\"";
 		Kernel::exit(2) ;
 	}
 
-	Kernel::link(in_name, out_name);
+	int res = Kernel::link(in_name, out_name);
+	if(res < 0) {
+	    Kernel::perror(PROGRAM_NAME);
+	    cout << PROGRAM_NAME << ": unable to link \"" << in_name << " to " << out_name << "\"";
+	    Kernel::exit(3);
+	}
 
 	// close the files
 	Kernel::close(in_fd);
+	Kernel::exit(0);
 }

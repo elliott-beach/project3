@@ -38,4 +38,5 @@ int main(int argc, char ** argv)
 		    Kernel::exit(3);
 		}
 	}
+	Kernel::exit(0);
 }
